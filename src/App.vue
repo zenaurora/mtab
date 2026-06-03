@@ -5,6 +5,7 @@ import WallpaperBg from './components/WallpaperBg.vue'
 import SearchBar from './components/SearchBar.vue'
 import DesktopCanvas from './components/DesktopCanvas.vue'
 import BrowserBookmarkBar from './components/BrowserBookmarkBar.vue'
+import SearchHistorySidebar from './components/SearchHistorySidebar.vue'
 import SettingsPanel from './components/settings/SettingsPanel.vue'
 
 const store = useSettingsStore()
@@ -64,6 +65,9 @@ watch(
 
     <!-- Desktop canvas: widgets + icons on a free grid -->
     <DesktopCanvas />
+
+    <!-- Chrome search history -->
+    <SearchHistorySidebar />
 
     <!-- Settings toggle button -->
     <button

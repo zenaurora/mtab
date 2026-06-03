@@ -8,7 +8,6 @@ const store = useSettingsStore()
 type BookmarkBarItem = BookmarkMenuItem
 
 const bookmarkBar = ref<BookmarkBarItem[]>([])
-const bookmarkSource = ref<'chrome' | 'local'>('local')
 const barEl = ref<HTMLElement | null>(null)
 const openFolderId = ref<string | null>(null)
 
@@ -16,9 +15,7 @@ const visibleItems = computed(() =>
   bookmarkBar.value.filter((item) => item.title || item.url || item.children?.length)
 )
 
-const barLabel = computed(() =>
-  bookmarkSource.value === 'chrome' ? 'Chrome bookmarks bar' : 'Local bookmarks bar preview'
-)
+const barLabel = computed(() => 'Chrome bookmarks bar')
 
 onMounted(() => {
   loadBrowserBookmarks()
@@ -37,18 +34,39 @@ function onDocumentPointerDown(event: PointerEvent) {
 
 function loadBrowserBookmarks() {
   if (typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
-    loadLocalBookmarkPreview()
+    bookmarkBar.value = []
     return
   }
 
   chrome.bookmarks.getChildren('1', (children) => {
-    if (chrome.runtime?.lastError) {
-      loadLocalBookmarkPreview()
+    if (chrome.runtime?.lastError || children.length === 0) {
+      loadBrowserBookmarksFromTree()
       return
     }
 
-    bookmarkSource.value = 'chrome'
     bookmarkBar.value = children.map(normalizeChromeBookmark)
+  })
+}
+
+function loadBrowserBookmarksFromTree() {
+  if (typeof chrome === 'undefined' || !chrome.bookmarks?.getTree) {
+    bookmarkBar.value = []
+    return
+  }
+
+  chrome.bookmarks.getTree((tree) => {
+    if (chrome.runtime?.lastError) {
+      bookmarkBar.value = []
+      return
+    }
+
+    const root = tree[0]
+    const bar =
+      root?.children?.find((node) => node.id === '1') ??
+      root?.children?.find((node) => /bookmark|书签|收藏/i.test(node.title)) ??
+      root?.children?.[0]
+
+    bookmarkBar.value = (bar?.children ?? []).map(normalizeChromeBookmark)
   })
 }
 
@@ -62,19 +80,9 @@ function normalizeChromeBookmark(item: chrome.bookmarks.BookmarkTreeNode): Bookm
   }
 }
 
-function loadLocalBookmarkPreview() {
-  bookmarkSource.value = 'local'
-  bookmarkBar.value = store.data.bookmarks.map((item) => ({
-    id: item.id,
-    title: item.name,
-    url: item.url,
-    childrenLoaded: true,
-  }))
-}
-
 function loadFolderChildren(item: BookmarkBarItem) {
   if (item.url || item.childrenLoaded) return
-  if (bookmarkSource.value !== 'chrome' || typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
+  if (typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
     item.children = []
     item.childrenLoaded = true
     return

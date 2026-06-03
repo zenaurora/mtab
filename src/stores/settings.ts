@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { loadStorageValue, saveStorageValue, useStorage } from '../composables/useStorage'
+import { loadStorageValue, removeStorageValue, useStorage } from '../composables/useStorage'
+import { loadLargeStorageValue, saveLargeStorageValue } from '../composables/useLargeStorage'
 import type {
   Settings,
   SearchEngine,
@@ -81,6 +82,7 @@ const DEFAULT_SETTINGS: Settings = {
 
 const SETTINGS_KEY = 'mtab_settings'
 const WALLPAPER_BASE64_KEY = 'mtab_wallpaper_base64'
+const LEGACY_SEARCH_HISTORY_KEY = 'mtab_search_history'
 const LOCAL_WALLPAPER_SOURCE = '__local_wallpaper_base64__'
 
 let uid = 0
@@ -119,7 +121,7 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.wallpaperBase64 = base64
     data.value.wallpaperUrl = ''
     data.value.wallpaperColor = ''
-    void saveStorageValue(WALLPAPER_BASE64_KEY, base64)
+    void saveLargeStorageValue(WALLPAPER_BASE64_KEY, base64)
   }
 
   function setWallpaperColor(color: string) {
@@ -132,7 +134,7 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.wallpaperUrl = ''
     data.value.wallpaperBase64 = ''
     data.value.wallpaperColor = ''
-    void saveStorageValue(WALLPAPER_BASE64_KEY, '')
+    void saveLargeStorageValue(WALLPAPER_BASE64_KEY, '')
   }
 
   function setBlurAmount(amount: number) {
@@ -172,7 +174,7 @@ export const useSettingsStore = defineStore('settings', () => {
   function applyFromHistory(entry: WallpaperEntry) {
     if (entry.sourceType === 'base64') {
       if (entry.source === LOCAL_WALLPAPER_SOURCE) {
-        void loadStorageValue<string>(WALLPAPER_BASE64_KEY).then((base64) => {
+        void loadStoredWallpaperBase64().then((base64) => {
           if (base64) setWallpaperBase64(base64)
         })
       } else {
@@ -495,6 +497,31 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function cleanupLegacyLargeStorage() {
+    const oldWallpaper = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
+    if (oldWallpaper) {
+      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, oldWallpaper)
+    }
+    await removeStorageValue(WALLPAPER_BASE64_KEY)
+    await removeStorageValue(LEGACY_SEARCH_HISTORY_KEY)
+  }
+
+  async function loadStoredWallpaperBase64() {
+    const indexedDbValue = await loadLargeStorageValue<string>(WALLPAPER_BASE64_KEY)
+    if (indexedDbValue) {
+      await removeStorageValue(WALLPAPER_BASE64_KEY)
+      return indexedDbValue
+    }
+
+    // Compatibility for old builds that tried to keep the wallpaper in chrome.storage/localStorage.
+    const oldValue = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
+    if (oldValue) {
+      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, oldValue)
+      await removeStorageValue(WALLPAPER_BASE64_KEY)
+    }
+    return oldValue
+  }
+
   function findFreePositionIgnoringOccupied(occupied: Set<string>) {
     const maxCols = 20
     for (let row = 0; row < 30; row++) {
@@ -509,8 +536,12 @@ export const useSettingsStore = defineStore('settings', () => {
     data,
     ready,
     async load() {
+      await cleanupLegacyLargeStorage()
       await load()
-      const localWallpaper = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
+      if (data.value.wallpaperBase64) {
+        await saveLargeStorageValue(WALLPAPER_BASE64_KEY, data.value.wallpaperBase64)
+      }
+      const localWallpaper = await loadStoredWallpaperBase64()
       if (localWallpaper && !data.value.wallpaperUrl && !data.value.wallpaperColor) {
         data.value.wallpaperBase64 = localWallpaper
       }

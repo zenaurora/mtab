@@ -3,7 +3,7 @@
   "name": "mtab - Custom New Tab",
   "version": "1.0.0",
   "description": "A customizable new tab page with wallpaper, search, widgets and more.",
-  "permissions": ["storage", "bookmarks","unlimitedStorage"],
+  "permissions": ["storage", "bookmarks", "history"],
   "chrome_url_overrides": {
     "newtab": "index.html"
   },

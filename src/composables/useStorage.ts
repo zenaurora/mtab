@@ -112,3 +112,15 @@ export async function saveStorageValue<T>(key: string, value: T): Promise<void> 
     console.warn(`[useStorage] Failed to save key "${key}":`, e)
   }
 }
+
+export async function removeStorageValue(key: string): Promise<void> {
+  try {
+    if (isChromeExtension) {
+      await chrome.storage.local.remove(key)
+    } else {
+      localStorage.removeItem(key)
+    }
+  } catch (e) {
+    console.warn(`[useStorage] Failed to remove key "${key}":`, e)
+  }
+}
