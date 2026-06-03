@@ -9,7 +9,7 @@ const isChromeExtension =
  * Reactive wrapper around chrome.storage.local.
  * Falls back to localStorage when not running as a Chrome extension.
  */
-export function useStorage<T>(key: string, defaultValue: T): {
+export function useStorage<T>(key: string, defaultValue: T, serializeValue: (value: T) => T = (value) => value): {
   data: Ref<T>
   ready: Ref<boolean>
   save: () => Promise<void>
@@ -40,10 +40,11 @@ export function useStorage<T>(key: string, defaultValue: T): {
 
   async function save() {
     try {
+      const value = serializeValue(data.value)
       if (isChromeExtension) {
-        await chrome.storage.local.set({ [key]: data.value })
+        await chrome.storage.local.set({ [key]: value })
       } else {
-        localStorage.setItem(key, JSON.stringify(data.value))
+        localStorage.setItem(key, JSON.stringify(value))
       }
     } catch (e) {
       console.warn(`[useStorage] Failed to save key "${key}":`, e)
@@ -63,4 +64,30 @@ export function useStorage<T>(key: string, defaultValue: T): {
   )
 
   return { data, ready, save, load }
+}
+
+export async function loadStorageValue<T>(key: string): Promise<T | undefined> {
+  try {
+    if (isChromeExtension) {
+      const result = await chrome.storage.local.get(key)
+      return result[key] as T | undefined
+    }
+    const stored = localStorage.getItem(key)
+    return stored === null ? undefined : (JSON.parse(stored) as T)
+  } catch (e) {
+    console.warn(`[useStorage] Failed to load key "${key}":`, e)
+    return undefined
+  }
+}
+
+export async function saveStorageValue<T>(key: string, value: T): Promise<void> {
+  try {
+    if (isChromeExtension) {
+      await chrome.storage.local.set({ [key]: value })
+    } else {
+      localStorage.setItem(key, JSON.stringify(value))
+    }
+  } catch (e) {
+    console.warn(`[useStorage] Failed to save key "${key}":`, e)
+  }
 }

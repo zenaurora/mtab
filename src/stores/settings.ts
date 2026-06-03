@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { useStorage } from '../composables/useStorage'
+import { loadStorageValue, saveStorageValue, useStorage } from '../composables/useStorage'
 import type {
   Settings,
   SearchEngine,
@@ -54,8 +54,15 @@ const DEFAULT_SETTINGS: Settings = {
   darkMode: true,
   widgets: [],
   bookmarks: DEFAULT_BOOKMARKS,
+  showAddButton: true,
+  addButtonGridX: 10,
+  addButtonGridY: 6,
   notesContent: '',
 }
+
+const SETTINGS_KEY = 'mtab_settings'
+const WALLPAPER_BASE64_KEY = 'mtab_wallpaper_base64'
+const LOCAL_WALLPAPER_SOURCE = '__local_wallpaper_base64__'
 
 let uid = 0
 function genId(prefix = 'id'): string {
@@ -64,9 +71,22 @@ function genId(prefix = 'id'): string {
 
 export const useSettingsStore = defineStore('settings', () => {
   const { data, ready, load, save } = useStorage<Settings>(
-    'mtab_settings',
-    { ...DEFAULT_SETTINGS }
+    SETTINGS_KEY,
+    { ...DEFAULT_SETTINGS },
+    sanitizeForStorage
   )
+
+  function sanitizeForStorage(settings: Settings): Settings {
+    return {
+      ...settings,
+      wallpaperBase64: '',
+      wallpaperHistory: settings.wallpaperHistory.map((entry) =>
+        entry.sourceType === 'base64'
+          ? { ...entry, source: LOCAL_WALLPAPER_SOURCE }
+          : entry
+      ),
+    }
+  }
 
   // ── Wallpaper ──────────────────────────────────────────
   function setWallpaperUrl(url: string) {
@@ -79,6 +99,7 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.wallpaperBase64 = base64
     data.value.wallpaperUrl = ''
     data.value.wallpaperColor = ''
+    void saveStorageValue(WALLPAPER_BASE64_KEY, base64)
   }
 
   function setWallpaperColor(color: string) {
@@ -91,6 +112,7 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.wallpaperUrl = ''
     data.value.wallpaperBase64 = ''
     data.value.wallpaperColor = ''
+    void saveStorageValue(WALLPAPER_BASE64_KEY, '')
   }
 
   function setBlurAmount(amount: number) {
@@ -100,10 +122,12 @@ export const useSettingsStore = defineStore('settings', () => {
   // ── Wallpaper History ─────────────────────────────────
   function addToHistory(entry: Omit<WallpaperEntry, 'id' | 'addedAt'>) {
     // Avoid duplicates by source
-    const existing = data.value.wallpaperHistory.find((h) => h.source === entry.source)
+    const normalizedSource = entry.sourceType === 'base64' ? LOCAL_WALLPAPER_SOURCE : entry.source
+    const existing = data.value.wallpaperHistory.find((h) => h.source === normalizedSource)
     if (existing) return existing.id
     const newEntry: WallpaperEntry = {
       ...entry,
+      source: normalizedSource,
       id: genId('wp'),
       addedAt: new Date().toISOString(),
     }
@@ -127,7 +151,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function applyFromHistory(entry: WallpaperEntry) {
     if (entry.sourceType === 'base64') {
-      setWallpaperBase64(entry.source)
+      if (entry.source === LOCAL_WALLPAPER_SOURCE) {
+        void loadStorageValue<string>(WALLPAPER_BASE64_KEY).then((base64) => {
+          if (base64) setWallpaperBase64(base64)
+        })
+      } else {
+        setWallpaperBase64(entry.source)
+      }
     } else {
       setWallpaperUrl(entry.source)
     }
@@ -246,6 +276,30 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  function moveBookmarks(patches: Array<{ id: string; gridX: number; gridY: number }>) {
+    if (patches.length === 0) return
+    const byId = new Map(data.value.bookmarks.map((b) => [b.id, b]))
+    for (const patch of patches) {
+      const bm = byId.get(patch.id)
+      if (!bm) continue
+      bm.gridX = Math.max(0, patch.gridX)
+      bm.gridY = Math.max(0, patch.gridY)
+    }
+  }
+
+  function moveAddButton(gridX: number, gridY: number) {
+    data.value.addButtonGridX = Math.max(0, gridX)
+    data.value.addButtonGridY = Math.max(0, gridY)
+  }
+
+  function hideAddButton() {
+    data.value.showAddButton = false
+  }
+
+  function showAddButton() {
+    data.value.showAddButton = true
+  }
+
   // ── Bookmarks ──────────────────────────────────────────
   function addBookmark(bookmark: Omit<Bookmark, 'id'>) {
     const pos = bookmark.gridX !== undefined
@@ -321,6 +375,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // ── Migration ──────────────────────────────────────────
   function migrateBookmarkPositions() {
+    data.value.showAddButton ??= true
+    data.value.addButtonGridX ??= 10
+    data.value.addButtonGridY ??= 6
+
     let startX = 5
     let startY = 6
     for (const bm of data.value.bookmarks) {
@@ -337,6 +395,56 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       }
     }
+
+    normalizeLayoutPositions()
+  }
+
+  function normalizeLayoutPositions() {
+    const occupied = new Set<string>()
+    const key = (gridX: number, gridY: number) => `${gridX},${gridY}`
+
+    for (const w of data.value.widgets) {
+      for (let dx = 0; dx < w.gridW; dx++) {
+        for (let dy = 0; dy < w.gridH; dy++) {
+          occupied.add(key(w.gridX + dx, w.gridY + dy))
+        }
+      }
+    }
+
+    for (const bm of data.value.bookmarks) {
+      const gridX = bm.gridX ?? 0
+      const gridY = bm.gridY ?? 0
+      const currentKey = key(gridX, gridY)
+      if (occupied.has(currentKey)) {
+        const pos = findFreePositionIgnoringOccupied(occupied)
+        bm.gridX = pos.gridX
+        bm.gridY = pos.gridY
+        occupied.add(key(pos.gridX, pos.gridY))
+      } else {
+        occupied.add(currentKey)
+      }
+      bm.gridW = 1
+      bm.gridH = 1
+    }
+
+    if (data.value.showAddButton) {
+      const addKey = key(data.value.addButtonGridX, data.value.addButtonGridY)
+      if (occupied.has(addKey)) {
+        const pos = findFreePositionIgnoringOccupied(occupied)
+        data.value.addButtonGridX = pos.gridX
+        data.value.addButtonGridY = pos.gridY
+      }
+    }
+  }
+
+  function findFreePositionIgnoringOccupied(occupied: Set<string>) {
+    const maxCols = 20
+    for (let row = 0; row < 30; row++) {
+      for (let col = 0; col < maxCols; col++) {
+        if (!occupied.has(`${col},${row}`)) return { gridX: col, gridY: row }
+      }
+    }
+    return { gridX: 0, gridY: 0 }
   }
 
   return {
@@ -344,6 +452,10 @@ export const useSettingsStore = defineStore('settings', () => {
     ready,
     async load() {
       await load()
+      const localWallpaper = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
+      if (localWallpaper && !data.value.wallpaperUrl && !data.value.wallpaperColor) {
+        data.value.wallpaperBase64 = localWallpaper
+      }
       migrateBookmarkPositions()
     },
     save,
@@ -378,6 +490,10 @@ export const useSettingsStore = defineStore('settings', () => {
     removeBookmark,
     reorderBookmarks,
     moveBookmark,
+    moveBookmarks,
+    moveAddButton,
+    hideAddButton,
+    showAddButton,
     migrateBookmarkPositions,
     // notes
     setNotesContent,

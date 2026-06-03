@@ -92,6 +92,11 @@ export interface Settings {
   // Bookmarks
   bookmarks: Bookmark[]
 
+  // Add shortcut desktop item
+  showAddButton: boolean
+  addButtonGridX: number
+  addButtonGridY: number
+
   // Notes widget content
   notesContent: string
 }

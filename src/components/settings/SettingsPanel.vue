@@ -155,12 +155,15 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
       <!-- Bookmarks tab -->
       <div v-else-if="activeTab === 'bookmarks'" class="bookmarks-tab">
         <h4>Add Bookmark</h4>
-        <div class="bm-form">
-          <input v-model="bmName" placeholder="Name (optional)" />
-          <input v-model="bmUrl" placeholder="URL (e.g. github.com)" @keydown.enter="addBookmark" />
-          <button class="primary" @click="addBookmark">Add</button>
-        </div>
-        <div v-if="store.data.bookmarks.length > 0" class="bm-list">
+	        <div class="bm-form">
+	          <input v-model="bmName" placeholder="Name (optional)" />
+	          <input v-model="bmUrl" placeholder="URL (e.g. github.com)" @keydown.enter="addBookmark" />
+	          <button class="primary" @click="addBookmark">Add</button>
+	        </div>
+	        <button v-if="!store.data.showAddButton" @click="store.showAddButton()">
+	          Restore Add Icon
+	        </button>
+	        <div v-if="store.data.bookmarks.length > 0" class="bm-list">
           <h4>Saved Bookmarks</h4>
           <div
             v-for="bm in store.data.bookmarks"

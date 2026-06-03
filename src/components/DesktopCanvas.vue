@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive, nextTick } from 'vue'
+import { ref, computed, reactive, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import type { Bookmark } from '../types'
 import ClockWidget from './widgets/ClockWidget.vue'
@@ -11,6 +11,7 @@ const store = useSettingsStore()
 
 const CELL = 96
 const DRAG_THRESHOLD = 6
+const ADD_BTN_ID = '__add_btn__'
 
 const loadedIcons = reactive(new Set<string>())
 const failedIcons = reactive(new Set<string>())
@@ -29,14 +30,30 @@ const startY = ref(0)
 const dragW = ref(0)
 const dragH = ref(0)
 const ghostEl = ref<HTMLElement | null>(null)
+const dropIndicatorEl = ref<HTMLElement | null>(null)
 let rafId = 0
 let justDragged = false
+let lastSnapGridX = -1
+let lastSnapGridY = -1
+
+type CellKey = `${number},${number}`
+type OccupancySnapshot = {
+  bookmarks: Map<CellKey, Bookmark>
+  widgetCells: Set<CellKey>
+}
+
+type BookmarkPositionPatch = {
+  id: string
+  gridX: number
+  gridY: number
+}
 
 // ── Grid snap state ──────────────────────────────────────────
 const snapGridX = ref(0)
 const snapGridY = ref(0)
 const dragStartGridX = ref(0)
 const dragStartGridY = ref(0)
+const previewPositions = ref<Record<string, { gridX: number; gridY: number }>>({})
 
 // ── Computed ─────────────────────────────────────────────────
 const draggingWidget = computed(() =>
@@ -54,10 +71,95 @@ const draggingBookmark = computed(() =>
 function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
   return {
     position: 'absolute' as const,
-    left: `${gridX * CELL}px`,
-    top: `${gridY * CELL}px`,
+    left: '0',
+    top: '0',
     width: `${gridW * CELL}px`,
     height: `${gridH * CELL}px`,
+    transform: `translate3d(${gridX * CELL}px, ${gridY * CELL}px, 0)`,
+  }
+}
+
+function iconGridStyle(id: string, gridX: number, gridY: number) {
+  const preview = previewPositions.value[id]
+  return gridStyle(preview?.gridX ?? gridX, preview?.gridY ?? gridY)
+}
+
+function cellKey(col: number, row: number): CellKey {
+  return `${col},${row}`
+}
+
+function buildOccupancySnapshot(excludeId?: string): OccupancySnapshot {
+  const bookmarks = new Map<CellKey, Bookmark>()
+  const widgetCells = new Set<CellKey>()
+
+  for (const b of store.data.bookmarks) {
+    if (b.id === excludeId) continue
+    if (b.gridX === undefined || b.gridY === undefined) continue
+    bookmarks.set(cellKey(b.gridX, b.gridY), b)
+  }
+
+  if (store.data.showAddButton && excludeId !== ADD_BTN_ID) {
+    bookmarks.set(cellKey(store.data.addButtonGridX, store.data.addButtonGridY), {
+      id: ADD_BTN_ID,
+      name: 'Add',
+      url: '',
+      gridX: store.data.addButtonGridX,
+      gridY: store.data.addButtonGridY,
+      gridW: 1,
+      gridH: 1,
+    })
+  }
+
+  for (const w of store.data.widgets) {
+    if (w.id === excludeId) continue
+    for (let dx = 0; dx < w.gridW; dx++) {
+      for (let dy = 0; dy < w.gridH; dy++) {
+        widgetCells.add(cellKey(w.gridX + dx, w.gridY + dy))
+      }
+    }
+  }
+
+  return { bookmarks, widgetCells }
+}
+
+function isOccupiedInSnapshot(snapshot: OccupancySnapshot, col: number, row: number): boolean {
+  const key = cellKey(col, row)
+  return snapshot.bookmarks.has(key) || snapshot.widgetCells.has(key)
+}
+
+function isAreaOccupiedInSnapshot(
+  snapshot: OccupancySnapshot,
+  col: number,
+  row: number,
+  gridW: number,
+  gridH: number,
+): boolean {
+  for (let dx = 0; dx < gridW; dx++) {
+    for (let dy = 0; dy < gridH; dy++) {
+      if (isOccupiedInSnapshot(snapshot, col + dx, row + dy)) return true
+    }
+  }
+  return false
+}
+
+function updateDropIndicatorDom(col: number, row: number) {
+  const el = dropIndicatorEl.value
+  if (!el) return
+
+  const snapshot = buildOccupancySnapshot(draggingId.value ?? undefined)
+  const occupied = isAreaOccupiedInSnapshot(snapshot, col, row, 1, 1)
+
+  el.style.width = `${dragW.value || CELL}px`
+  el.style.height = `${dragH.value || CELL}px`
+  el.style.transform = `translate3d(${col * CELL}px, ${row * CELL}px, 0)`
+  el.style.borderColor = occupied ? 'rgba(239, 68, 68, 0.6)' : 'var(--accent)'
+  el.style.background = occupied ? 'rgba(239, 68, 68, 0.06)' : 'rgba(99, 102, 241, 0.06)'
+}
+
+function pointerToGrid(x: number, y: number) {
+  return {
+    gridX: Math.max(0, Math.round((x + dragW.value / 2 - CELL / 2) / CELL)),
+    gridY: Math.max(0, Math.round((y + dragH.value / 2 - CELL / 2) / CELL)),
   }
 }
 
@@ -111,6 +213,30 @@ function onIconPointerDown(e: PointerEvent, bm: Bookmark) {
   e.preventDefault()
 }
 
+function onAddBtnPointerDown(e: PointerEvent) {
+  if (e.button !== 0) return
+  const target = e.target as HTMLElement
+  if (target.closest('.icon-del')) return
+
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  draggingId.value = ADD_BTN_ID
+  dragKind.value = 'icon'
+  pendingDrag.value = true
+  isDragging.value = false
+  dragStartGridX.value = store.data.addButtonGridX
+  dragStartGridY.value = store.data.addButtonGridY
+  ghostXRaw = rect.left
+  ghostYRaw = rect.top
+  dragOffsetX.value = e.clientX - rect.left
+  dragOffsetY.value = e.clientY - rect.top
+  dragW.value = rect.width
+  dragH.value = rect.height
+  startX.value = e.clientX
+  startY.value = e.clientY
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  e.preventDefault()
+}
+
 // ── Shared pointer move (RAF-throttled) ──────────────────────
 function onPointerMove(e: PointerEvent) {
   if (!pendingDrag.value && !isDragging.value) return
@@ -122,12 +248,17 @@ function onPointerMove(e: PointerEvent) {
     pendingDrag.value = false
     ghostXRaw = e.clientX - dragOffsetX.value
     ghostYRaw = e.clientY - dragOffsetY.value
-    snapGridX.value = Math.max(0, Math.round(ghostXRaw / CELL))
-    snapGridY.value = Math.max(0, Math.round(ghostYRaw / CELL))
+    const snap = pointerToGrid(ghostXRaw, ghostYRaw)
+    snapGridX.value = snap.gridX
+    snapGridY.value = snap.gridY
+    lastSnapGridX = snapGridX.value
+    lastSnapGridY = snapGridY.value
+    updatePreviewPositions(snapGridX.value, snapGridY.value)
     nextTick(() => {
       if (ghostEl.value) {
-        ghostEl.value.style.transform = `translate(${ghostXRaw}px, ${ghostYRaw}px) scale(1.05)`
+        ghostEl.value.style.transform = `translate3d(${ghostXRaw}px, ${ghostYRaw}px, 0) scale(1.05)`
       }
+      updateDropIndicatorDom(snapGridX.value, snapGridY.value)
     })
   }
 
@@ -143,43 +274,40 @@ function onPointerMove(e: PointerEvent) {
     ghostXRaw = gx
     ghostYRaw = gy
     if (ghostEl.value) {
-      ghostEl.value.style.transform = `translate(${gx}px, ${gy}px) scale(1.05)`
+      ghostEl.value.style.transform = `translate3d(${gx}px, ${gy}px, 0) scale(1.05)`
     }
-    const newSx = Math.max(0, Math.round(gx / CELL))
-    const newSy = Math.max(0, Math.round(gy / CELL))
-    if (newSx !== snapGridX.value) snapGridX.value = newSx
-    if (newSy !== snapGridY.value) snapGridY.value = newSy
+    const snap = pointerToGrid(gx, gy)
+    const newSx = snap.gridX
+    const newSy = snap.gridY
+    if (newSx !== lastSnapGridX || newSy !== lastSnapGridY) {
+      lastSnapGridX = newSx
+      lastSnapGridY = newSy
+      snapGridX.value = newSx
+      snapGridY.value = newSy
+      updatePreviewPositions(newSx, newSy)
+      updateDropIndicatorDom(newSx, newSy)
+    }
   })
+}
+
+function onWindowPointerMove(e: PointerEvent) {
+  if (!pendingDrag.value && !isDragging.value) return
+  onPointerMove(e)
+}
+
+function onWindowPointerUp() {
+  if (!pendingDrag.value && !isDragging.value) return
+  onPointerUp()
 }
 
 // ── Collision detection ──────────────────────────────────────
-function findBookmarkAt(col: number, row: number, excludeId?: string): Bookmark | undefined {
-  return store.data.bookmarks.find((b) => {
-    if (b.id === excludeId) return false
-    return b.gridX === col && b.gridY === row
-  })
-}
-
-function findWidgetAt(col: number, row: number, excludeId?: string) {
-  return store.data.widgets.find((w) => {
-    if (w.id === excludeId) return false
-    return col >= w.gridX && col < w.gridX + w.gridW &&
-           row >= w.gridY && row < w.gridY + w.gridH
-  })
-}
-
-function isCellOccupied(col: number, row: number, gridW: number, gridH: number, excludeId?: string): boolean {
-  for (let dx = 0; dx < gridW; dx++) {
-    for (let dy = 0; dy < gridH; dy++) {
-      if (findBookmarkAt(col + dx, row + dy, excludeId)) return true
-      if (findWidgetAt(col + dx, row + dy, excludeId)) return true
-    }
-  }
-  return false
-}
-
 function findFreePosition(gx: number, gy: number, gridW: number, gridH: number, excludeId?: string) {
-  if (!isCellOccupied(gx, gy, gridW, gridH, excludeId)) return { gridX: gx, gridY: gy }
+  const snapshot = buildOccupancySnapshot(excludeId)
+  return findFreePositionInSnapshot(snapshot, gx, gy, gridW, gridH)
+}
+
+function findFreePositionInSnapshot(snapshot: OccupancySnapshot, gx: number, gy: number, gridW: number, gridH: number) {
+  if (!isAreaOccupiedInSnapshot(snapshot, gx, gy, gridW, gridH)) return { gridX: gx, gridY: gy }
   for (let radius = 1; radius < 30; radius++) {
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -187,7 +315,7 @@ function findFreePosition(gx: number, gy: number, gridW: number, gridH: number, 
         const nx = gx + dx
         const ny = gy + dy
         if (nx < 0 || ny < 0) continue
-        if (!isCellOccupied(nx, ny, gridW, gridH, excludeId)) return { gridX: nx, gridY: ny }
+        if (!isAreaOccupiedInSnapshot(snapshot, nx, ny, gridW, gridH)) return { gridX: nx, gridY: ny }
       }
     }
   }
@@ -195,59 +323,155 @@ function findFreePosition(gx: number, gy: number, gridW: number, gridH: number, 
 }
 
 // ── Cascade shift (Android-style push) ───────────────────────
-// When dropping onto an occupied icon cell, push that icon (and
-// anything blocking it) in the drag direction.
-function cascadeShift(col: number, row: number, dragFromCol: number, dragFromRow: number, excludeId?: string, depth = 0): void {
-  if (depth > 10) return
-
-  // Determine push direction from drag vector
+function getPushDirection(col: number, row: number, dragFromCol: number, dragFromRow: number) {
   const dx = col - dragFromCol
   const dy = row - dragFromRow
-  let pushDx = 0
-  let pushDy = 0
   if (Math.abs(dx) >= Math.abs(dy)) {
-    pushDx = dx > 0 ? 1 : dx < 0 ? -1 : 1
-  } else {
-    pushDy = dy > 0 ? 1 : dy < 0 ? -1 : 1
+    return { dx: dx > 0 ? 1 : dx < 0 ? -1 : 1, dy: 0 }
   }
+  return { dx: 0, dy: dy > 0 ? 1 : dy < 0 ? -1 : 1 }
+}
 
-  const targetCol = col + pushDx
-  const targetRow = row + pushDy
+function moveBookmarkInSnapshot(
+  snapshot: OccupancySnapshot,
+  patches: BookmarkPositionPatch[],
+  bm: Bookmark,
+  gridX: number,
+  gridY: number,
+) {
+  if (bm.gridX !== undefined && bm.gridY !== undefined) {
+    snapshot.bookmarks.delete(cellKey(bm.gridX, bm.gridY))
+  }
+  snapshot.bookmarks.set(cellKey(gridX, gridY), bm)
+  patches.push({ id: bm.id, gridX, gridY })
+}
+
+// When dropping onto an occupied icon cell, push that icon (and
+// anything blocking it) in the drag direction. This simulates in a
+// plain Map first, then commits patches once.
+function planCascadeShift(
+  snapshot: OccupancySnapshot,
+  col: number,
+  row: number,
+  dragFromCol: number,
+  dragFromRow: number,
+  patches: BookmarkPositionPatch[],
+  depth = 0,
+): void {
+  if (depth > 10) return
+
+  const push = getPushDirection(col, row, dragFromCol, dragFromRow)
+  const targetCol = col + push.dx
+  const targetRow = row + push.dy
 
   // If the push destination is also occupied by a bookmark, cascade first
-  const blocker = findBookmarkAt(targetCol, targetRow, excludeId)
+  const blocker = snapshot.bookmarks.get(cellKey(targetCol, targetRow))
   if (blocker) {
-    cascadeShift(targetCol, targetRow, col, row, excludeId, depth + 1)
+    planCascadeShift(snapshot, targetCol, targetRow, col, row, patches, depth + 1)
   }
 
   // If still blocked (by widget or another bookmark), find nearest free cell
-  if (isCellOccupied(targetCol, targetRow, 1, 1, excludeId)) {
-    const free = findFreePosition(col, row, 1, 1, excludeId)
-    const bm = findBookmarkAt(col, row, excludeId)
-    if (bm) {
-      bm.gridX = free.gridX
-      bm.gridY = free.gridY
-    }
+  const bm = snapshot.bookmarks.get(cellKey(col, row))
+  if (!bm) return
+
+  if (isOccupiedInSnapshot(snapshot, targetCol, targetRow)) {
+    const free = findFreePositionInSnapshot(snapshot, col, row, 1, 1)
+    moveBookmarkInSnapshot(snapshot, patches, bm, free.gridX, free.gridY)
     return
   }
 
   // Move the icon at (col, row) to (targetCol, targetRow)
-  const bm = findBookmarkAt(col, row, excludeId)
-  if (bm) {
-    bm.gridX = targetCol
-    bm.gridY = targetRow
+  moveBookmarkInSnapshot(snapshot, patches, bm, targetCol, targetRow)
+}
+
+function planIconDrop(id: string, rawX: number, rawY: number): BookmarkPositionPatch[] {
+  const snapshot = buildOccupancySnapshot(id)
+  const occupant = snapshot.bookmarks.get(cellKey(rawX, rawY))
+  const widgetBlocker = snapshot.widgetCells.has(cellKey(rawX, rawY))
+
+  if (occupant) {
+    const patches: BookmarkPositionPatch[] = []
+    planCascadeShift(snapshot, rawX, rawY, dragStartGridX.value, dragStartGridY.value, patches)
+    patches.push({ id, gridX: rawX, gridY: rawY })
+    return patches
   }
+
+  if (widgetBlocker) {
+    const pos = findFreePositionInSnapshot(snapshot, rawX, rawY, 1, 1)
+    return [{ id, gridX: pos.gridX, gridY: pos.gridY }]
+  }
+
+  return [{ id, gridX: rawX, gridY: rawY }]
+}
+
+function commitIconPatches(patches: BookmarkPositionPatch[]) {
+  const normalizedPatches = resolvePatchCollisions(patches)
+  const bookmarkPatches = normalizedPatches.filter((patch) => patch.id !== ADD_BTN_ID)
+  const addPatch = normalizedPatches.find((patch) => patch.id === ADD_BTN_ID)
+
+  if (bookmarkPatches.length > 0) store.moveBookmarks(bookmarkPatches)
+  if (addPatch) store.moveAddButton(addPatch.gridX, addPatch.gridY)
+}
+
+function resolvePatchCollisions(patches: BookmarkPositionPatch[]) {
+  const result: BookmarkPositionPatch[] = []
+  const occupied = buildOccupancySnapshot(draggingId.value ?? undefined)
+
+  for (const patch of patches) {
+    const fromBookmark = store.data.bookmarks.find((b) => b.id === patch.id)
+    if (fromBookmark?.gridX !== undefined && fromBookmark.gridY !== undefined) {
+      occupied.bookmarks.delete(cellKey(fromBookmark.gridX, fromBookmark.gridY))
+    }
+    if (patch.id === ADD_BTN_ID) {
+      occupied.bookmarks.delete(cellKey(store.data.addButtonGridX, store.data.addButtonGridY))
+    }
+  }
+
+  for (const patch of patches) {
+    let gridX = patch.gridX
+    let gridY = patch.gridY
+    if (isOccupiedInSnapshot(occupied, gridX, gridY)) {
+      const free = findFreePositionInSnapshot(occupied, gridX, gridY, 1, 1)
+      gridX = free.gridX
+      gridY = free.gridY
+    }
+    occupied.bookmarks.set(cellKey(gridX, gridY), {
+      id: patch.id,
+      name: '',
+      url: '',
+      gridX,
+      gridY,
+      gridW: 1,
+      gridH: 1,
+    })
+    result.push({ id: patch.id, gridX, gridY })
+  }
+
+  return result
+}
+
+function updatePreviewPositions(rawX: number, rawY: number) {
+  if (dragKind.value !== 'icon' || !draggingId.value) {
+    previewPositions.value = {}
+    return
+  }
+
+  const next: Record<string, { gridX: number; gridY: number }> = {}
+  for (const patch of planIconDrop(draggingId.value, rawX, rawY)) {
+    next[patch.id] = { gridX: patch.gridX, gridY: patch.gridY }
+  }
+  previewPositions.value = next
 }
 
 // ── Pointer up (drop) ────────────────────────────────────────
 function onPointerUp() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = 0 }
 
-  if (pendingDrag.value && !isDragging.value) {
-    if (dragKind.value === 'icon' && draggingId.value && !justDragged) {
-      const bm = store.data.bookmarks.find((b) => b.id === draggingId.value)
-      if (bm) window.location.href = bm.url
-    }
+	  if (pendingDrag.value && !isDragging.value) {
+	    if (dragKind.value === 'icon' && draggingId.value && draggingId.value !== ADD_BTN_ID && !justDragged) {
+	      const bm = store.data.bookmarks.find((b) => b.id === draggingId.value)
+	      if (bm) window.location.href = bm.url
+	    }
     resetDrag()
     return
   }
@@ -262,25 +486,10 @@ function onPointerUp() {
     const gh = w?.gridH ?? 1
     const pos = findFreePosition(rawX, rawY, gw, gh, draggingId.value)
     store.moveWidget(draggingId.value, pos.gridX, pos.gridY)
-  } else if (dragKind.value === 'icon' && draggingId.value) {
-    // Check what's at the target position
-    const occupant = findBookmarkAt(rawX, rawY, draggingId.value)
-    const widgetBlocker = findWidgetAt(rawX, rawY, draggingId.value)
-
-    if (occupant) {
-      // Occupied by another bookmark → cascade push (Android-style)
-      cascadeShift(rawX, rawY, dragStartGridX.value, dragStartGridY.value, draggingId.value)
-      // Now place the dragged icon at the freed position
-      store.moveBookmark(draggingId.value, rawX, rawY)
-    } else if (widgetBlocker) {
-      // Occupied by a widget → find nearest free cell
-      const pos = findFreePosition(rawX, rawY, 1, 1, draggingId.value)
-      store.moveBookmark(draggingId.value, pos.gridX, pos.gridY)
-    } else {
-      // Cell is free → place directly
-      store.moveBookmark(draggingId.value, rawX, rawY)
-    }
-  }
+	  } else if (dragKind.value === 'icon' && draggingId.value) {
+	    const patches = planIconDrop(draggingId.value, rawX, rawY)
+	    commitIconPatches(patches)
+	  }
   resetDrag()
 }
 
@@ -289,10 +498,11 @@ function resetDrag() {
     justDragged = true
     setTimeout(() => { justDragged = false }, 100)
   }
-  isDragging.value = false
-  pendingDrag.value = false
-  draggingId.value = null
-}
+	  isDragging.value = false
+	  pendingDrag.value = false
+	  draggingId.value = null
+	  previewPositions.value = {}
+	}
 
 // ── Helpers ──────────────────────────────────────────────────
 function faviconUrl(url: string): string {
@@ -310,26 +520,6 @@ function displayName(bm: Bookmark): string {
 function iconImgStyle() {
   return { width: `${store.data.iconSize}px`, height: `${store.data.iconSize}px` }
 }
-
-// ── Add button position (auto-placed at next free cell) ──────
-const addBtnPos = computed(() => {
-  const bms = store.data.bookmarks.filter((b) => b.gridY !== undefined)
-  const startY = bms.length > 0 ? Math.max(...bms.map((b) => b.gridY ?? 6)) : 6
-  return store.findFreePosition(1, 1, startY)
-})
-
-// ── Drop indicator style ─────────────────────────────────────
-const dropIndicatorStyle = computed(() => {
-  const occupied = isCellOccupied(snapGridX.value, snapGridY.value, 1, 1, draggingId.value ?? undefined)
-  return {
-    left: `${snapGridX.value * CELL}px`,
-    top: `${snapGridY.value * CELL}px`,
-    width: `${dragW.value || CELL}px`,
-    height: `${dragH.value || CELL}px`,
-    borderColor: occupied ? 'rgba(239, 68, 68, 0.6)' : 'var(--accent)',
-    background: occupied ? 'rgba(239, 68, 68, 0.06)' : 'rgba(99, 102, 241, 0.06)',
-  }
-})
 
 // ── Add / Edit modal ─────────────────────────────────────────
 const showModal = ref(false)
@@ -370,6 +560,16 @@ function submitModal() {
 const componentMap: Record<string, typeof ClockWidget> = {
   clock: ClockWidget, date: DateWidget, notes: NotesWidget, bookmarks: BookmarkWidget,
 }
+
+onMounted(() => {
+  window.addEventListener('pointermove', onWindowPointerMove)
+  window.addEventListener('pointerup', onWindowPointerUp)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('pointermove', onWindowPointerMove)
+  window.removeEventListener('pointerup', onWindowPointerUp)
+})
 </script>
 
 <template>
@@ -397,13 +597,13 @@ const componentMap: Record<string, typeof ClockWidget> = {
 
     <!-- ── Bookmark icons (free-form grid, cascade on collision) ── -->
     <div
-      v-for="bm in store.data.bookmarks"
-      :key="bm.id"
-      v-show="bm.gridX !== undefined && bm.gridY !== undefined"
-      class="canvas-item icon-item"
-      :class="{ 'is-dragging': isDragging && draggingId === bm.id }"
-      :style="gridStyle(bm.gridX ?? 0, bm.gridY ?? 0)"
-      @pointerdown="onIconPointerDown($event, bm)"
+	      v-for="bm in store.data.bookmarks"
+	      :key="bm.id"
+	      v-show="bm.gridX !== undefined && bm.gridY !== undefined"
+	      class="canvas-item icon-item"
+	      :class="{ 'is-dragging': isDragging && draggingId === bm.id }"
+	      :style="iconGridStyle(bm.id, bm.gridX ?? 0, bm.gridY ?? 0)"
+	      @pointerdown="onIconPointerDown($event, bm)"
     >
       <span class="icon-del" @click.stop="store.removeBookmark(bm.id)" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -432,16 +632,24 @@ const componentMap: Record<string, typeof ClockWidget> = {
       <span class="icon-label">{{ displayName(bm) }}</span>
     </div>
 
-    <!-- ── Add button (auto-positioned) ─────────────────────── -->
-    <div
-      class="canvas-item icon-item icon-add"
-      :style="gridStyle(addBtnPos.gridX, addBtnPos.gridY)"
-      @click="openAddModal"
-      title="Add shortcut"
-    >
-      <div class="icon-img-wrap icon-add-img" :style="iconImgStyle()">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 5v14M5 12h14"/>
+	    <!-- ── Add button ───────────────────────────────────────── -->
+	    <div
+	      v-if="store.data.showAddButton"
+	      class="canvas-item icon-item icon-add"
+	      :class="{ 'is-dragging': isDragging && draggingId === ADD_BTN_ID }"
+	      :style="iconGridStyle(ADD_BTN_ID, store.data.addButtonGridX, store.data.addButtonGridY)"
+	      @pointerdown="onAddBtnPointerDown"
+	      @click="openAddModal"
+	      title="Add shortcut"
+	    >
+	      <span class="icon-del" @click.stop="store.hideAddButton()" title="Remove">
+	        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+	          <path d="M18 6L6 18M6 6l12 12"/>
+	        </svg>
+	      </span>
+	      <div class="icon-img-wrap icon-add-img" :style="iconImgStyle()">
+	        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+	          <path d="M12 5v14M5 12h14"/>
         </svg>
       </div>
       <span class="icon-label">Add</span>
@@ -450,8 +658,8 @@ const componentMap: Record<string, typeof ClockWidget> = {
     <!-- ── Drop zone indicator ──────────────────────────────── -->
     <div
       v-if="isDragging"
+      ref="dropIndicatorEl"
       class="drop-indicator"
-      :style="dropIndicatorStyle"
     />
   </div>
 
@@ -468,15 +676,23 @@ const componentMap: Record<string, typeof ClockWidget> = {
           <component :is="componentMap[draggingWidget.type]" />
         </div>
       </div>
-      <div v-else-if="draggingBookmark" class="ghost-icon">
-        <div class="icon-img-wrap" :style="iconImgStyle()">
-          <span v-if="failedIcons.has(draggingBookmark.id)" class="icon-fallback">
-            {{ displayName(draggingBookmark).charAt(0).toUpperCase() }}
-          </span>
-          <img v-else :src="faviconUrl(draggingBookmark.url)" :alt="draggingBookmark.name" class="icon-img" />
-        </div>
-        <span class="icon-label">{{ displayName(draggingBookmark) }}</span>
-      </div>
+	      <div v-else-if="draggingBookmark" class="ghost-icon">
+	        <div class="icon-img-wrap" :style="iconImgStyle()">
+	          <span v-if="failedIcons.has(draggingBookmark.id)" class="icon-fallback">
+	            {{ displayName(draggingBookmark).charAt(0).toUpperCase() }}
+	          </span>
+	          <img v-else :src="faviconUrl(draggingBookmark.url)" :alt="draggingBookmark.name" class="icon-img" />
+	        </div>
+	        <span class="icon-label">{{ displayName(draggingBookmark) }}</span>
+	      </div>
+	      <div v-else-if="draggingId === ADD_BTN_ID" class="ghost-icon">
+	        <div class="icon-img-wrap icon-add-img" :style="iconImgStyle()">
+	          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+	            <path d="M12 5v14M5 12h14"/>
+	          </svg>
+	        </div>
+	        <span class="icon-label">Add</span>
+	      </div>
     </div>
   </Teleport>
 
@@ -516,10 +732,7 @@ const componentMap: Record<string, typeof ClockWidget> = {
 .canvas-item {
   pointer-events: auto;
   cursor: grab;
-  will-change: left, top, opacity;
-  transition: left 0.25s cubic-bezier(0.2, 0, 0, 1),
-              top 0.25s cubic-bezier(0.2, 0, 0, 1),
-              opacity 0.15s;
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s;
 }
 
 .canvas-item:active { cursor: grabbing; }
@@ -649,11 +862,14 @@ const componentMap: Record<string, typeof ClockWidget> = {
 /* ── Drop zone indicator ───────────────────────────────────── */
 .drop-indicator {
   position: absolute;
+  left: 0;
+  top: 0;
   border: 2px dashed var(--accent);
   border-radius: 12px;
   background: rgba(99, 102, 241, 0.06);
   pointer-events: none;
-  transition: left 0.12s ease, top 0.12s ease, border-color 0.15s, background 0.15s;
+  will-change: transform;
+  transition: transform 0.12s ease, border-color 0.15s, background 0.15s;
 }
 </style>
 
@@ -666,7 +882,6 @@ const componentMap: Record<string, typeof ClockWidget> = {
   z-index: 9999;
   pointer-events: none;
   will-change: transform;
-  filter: drop-shadow(0 16px 48px rgba(0, 0, 0, 0.45));
 }
 
 .ghost-widget { width: 100%; height: 100%; }
@@ -679,8 +894,7 @@ const componentMap: Record<string, typeof ClockWidget> = {
   padding: 10px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .modal-overlay {
