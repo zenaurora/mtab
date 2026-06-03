@@ -6,6 +6,7 @@ import ClockWidget from './widgets/ClockWidget.vue'
 import DateWidget from './widgets/DateWidget.vue'
 import NotesWidget from './widgets/NotesWidget.vue'
 import BookmarkWidget from './widgets/BookmarkWidget.vue'
+import BookmarkIcon from './BookmarkIcon.vue'
 
 const store = useSettingsStore()
 
@@ -60,7 +61,8 @@ const snapGridX = ref(0)
 const snapGridY = ref(0)
 const dragStartGridX = ref(0)
 const dragStartGridY = ref(0)
-const previewPositions = ref<Record<string, { gridX: number; gridY: number }>>({})
+// reactive allows Vue to track per-key accesses, so only affected icons re-render on drag
+const previewPositions = reactive<Record<string, { gridX: number; gridY: number }>>({})
 let dragSnapshot: OccupancySnapshot | null = null
 let lastDropPlan: DropPlan | null = null
 
@@ -99,16 +101,17 @@ const canvasOffset = computed(() => {
   }
 })
 
-function gridCellSize() {
-  return cellSize.value
-}
+const iconImgStyle = computed(() => ({
+  width: `${store.data.iconSize}px`,
+  height: `${store.data.iconSize}px`,
+}))
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
 function gridBounds(gridW = 1, gridH = 1) {
-  const cell = gridCellSize()
+  const cell = cellSize.value
   const offset = canvasOffset.value
   const minX = Math.max(0, Math.ceil(-offset.x / cell))
   const minY = Math.max(0, Math.ceil(-offset.y / cell))
@@ -137,7 +140,7 @@ function isWithinGridBounds(gridX: number, gridY: number, gridW = 1, gridH = 1) 
 }
 
 function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
-  const cell = gridCellSize()
+  const cell = cellSize.value
   const offset = canvasOffset.value
   const pos = clampGridPosition(gridX, gridY, gridW, gridH)
   return {
@@ -151,7 +154,7 @@ function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
 }
 
 function iconGridStyle(id: string, gridX: number, gridY: number) {
-  const preview = previewPositions.value[id]
+  const preview = previewPositions[id]
   return gridStyle(preview?.gridX ?? gridX, preview?.gridY ?? gridY)
 }
 
@@ -163,7 +166,9 @@ function itemClass(id: string) {
 }
 
 function markInstantMove(id: string) {
-  instantMoveIds.value = new Set([...instantMoveIds.value, id])
+  const s = new Set(instantMoveIds.value)
+  s.add(id)
+  instantMoveIds.value = s
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       const next = new Set(instantMoveIds.value)
@@ -242,7 +247,7 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
   const el = dropIndicatorEl.value
   if (!el) return
 
-  const cell = gridCellSize()
+  const cell = cellSize.value
   const offset = canvasOffset.value
   const gridW = Math.max(1, Math.ceil((dragW.value || cell) / cell))
   const gridH = Math.max(1, Math.ceil((dragH.value || cell) / cell))
@@ -256,7 +261,7 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
 }
 
 function pointerToGrid(x: number, y: number) {
-  const cell = gridCellSize()
+  const cell = cellSize.value
   const offset = canvasOffset.value
   const gridW = Math.max(1, Math.ceil((dragW.value || cell) / cell))
   const gridH = Math.max(1, Math.ceil((dragH.value || cell) / cell))
@@ -299,7 +304,7 @@ function onWidgetPointerDown(e: PointerEvent, widgetId: string, gx: number, gy: 
   ghostYRaw = rect.top
   dragOffsetX.value = e.clientX - rect.left
   dragOffsetY.value = e.clientY - rect.top
-  const cell = gridCellSize()
+  const cell = cellSize.value
   dragW.value = gw * cell
   dragH.value = gh * cell
   startX.value = e.clientX
@@ -627,17 +632,19 @@ function clampCurrentLayoutToViewport() {
 
 function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
   if (dragKind.value !== 'icon' || !draggingId.value) {
-    previewPositions.value = {}
+    for (const key in previewPositions) delete previewPositions[key]
     lastDropPlan = { patches: [], occupied: false }
     return lastDropPlan
   }
 
   const plan = planIconDrop(draggingId.value, rawX, rawY)
-  const next: Record<string, { gridX: number; gridY: number }> = {}
-  for (const patch of plan.patches) {
-    next[patch.id] = { gridX: patch.gridX, gridY: patch.gridY }
+  const newKeys = new Set(plan.patches.map((p) => p.id))
+  for (const key in previewPositions) {
+    if (!newKeys.has(key)) delete previewPositions[key]
   }
-  previewPositions.value = next
+  for (const patch of plan.patches) {
+    previewPositions[patch.id] = { gridX: patch.gridX, gridY: patch.gridY }
+  }
   lastDropPlan = plan
   return plan
 }
@@ -687,7 +694,7 @@ function resetDrag() {
   isDragging.value = false
   pendingDrag.value = false
   draggingId.value = null
-  previewPositions.value = {}
+  for (const key in previewPositions) delete previewPositions[key]
   dragSnapshot = null
   lastDropPlan = null
   lastSnapGridX = -1
@@ -695,25 +702,8 @@ function resetDrag() {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-function faviconUrl(bookmark: Bookmark): string {
-  if (bookmark.iconUrl) return bookmark.iconUrl
-  try {
-    return `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=128`
-  } catch {
-    return ''
-  }
-}
-
 function extractDomain(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
-}
-
-function displayName(bm: Bookmark): string {
-  return bm.name || extractDomain(bm.url)
-}
-
-function iconImgStyle() {
-  return { width: `${store.data.iconSize}px`, height: `${store.data.iconSize}px` }
 }
 
 // ── Add / Edit modal ─────────────────────────────────────────
@@ -788,17 +778,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    class="desktop-canvas"
-    @pointermove="onPointerMove"
-    @pointerup="onPointerUp"
-  >
+  <div class="desktop-canvas">
     <!-- ── Widgets (free-form grid) ─────────────────────────── -->
     <div
       v-for="w in store.data.widgets"
-	      :key="w.id"
-	      class="canvas-item widget-item glass-panel"
-	      :class="itemClass(w.id)"
+      :key="w.id"
+      class="canvas-item widget-item glass-panel"
+      :class="itemClass(w.id)"
       :style="gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
       @pointerdown="onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)"
     >
@@ -812,13 +798,13 @@ onUnmounted(() => {
 
     <!-- ── Bookmark icons (free-form grid, cascade on collision) ── -->
     <div
-	      v-for="bm in store.data.bookmarks"
-	      :key="bm.id"
-	      v-show="bm.gridX !== undefined && bm.gridY !== undefined"
-	      class="canvas-item icon-item"
-	      :class="itemClass(bm.id)"
-	      :style="iconGridStyle(bm.id, bm.gridX ?? 0, bm.gridY ?? 0)"
-	      @pointerdown="onIconPointerDown($event, bm)"
+      v-for="bm in store.data.bookmarks"
+      :key="bm.id"
+      v-show="bm.gridX !== undefined && bm.gridY !== undefined"
+      class="canvas-item icon-item"
+      :class="itemClass(bm.id)"
+      :style="iconGridStyle(bm.id, bm.gridX ?? 0, bm.gridY ?? 0)"
+      @pointerdown="onIconPointerDown($event, bm)"
     >
       <span class="icon-del" @click.stop="store.removeBookmark(bm.id)" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -831,40 +817,33 @@ onUnmounted(() => {
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
       </span>
-      <div class="icon-img-wrap" :style="iconImgStyle()">
-        <span v-if="failedIcons.has(bm.id)" class="icon-fallback">
-          {{ displayName(bm).charAt(0).toUpperCase() }}
-        </span>
-        <img
-          v-else
-          :src="faviconUrl(bm)"
-          :alt="bm.name"
-          class="icon-img"
-          @load="failedIcons.delete(bm.id)"
-          @error="failedIcons.add(bm.id)"
-        />
-      </div>
-      <span class="icon-label">{{ displayName(bm) }}</span>
+      <BookmarkIcon
+        :bookmark="bm"
+        :img-style="iconImgStyle"
+        :failed="failedIcons.has(bm.id)"
+        @load="failedIcons.delete(bm.id)"
+        @error="failedIcons.add(bm.id)"
+      />
     </div>
 
-	    <!-- ── Add button ───────────────────────────────────────── -->
-	    <div
-	      v-if="store.data.showAddButton"
-	      class="canvas-item icon-item icon-add"
-	      :class="itemClass(ADD_BTN_ID)"
-	      :style="iconGridStyle(ADD_BTN_ID, store.data.addButtonGridX, store.data.addButtonGridY)"
-	      @pointerdown="onAddBtnPointerDown"
-	      @click="openAddModal"
-	      title="Add shortcut"
-	    >
-	      <span class="icon-del" @click.stop="store.hideAddButton()" title="Remove">
-	        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-	          <path d="M18 6L6 18M6 6l12 12"/>
-	        </svg>
-	      </span>
-	      <div class="icon-img-wrap icon-add-img" :style="iconImgStyle()">
-	        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-	          <path d="M12 5v14M5 12h14"/>
+    <!-- ── Add button ───────────────────────────────────────── -->
+    <div
+      v-if="store.data.showAddButton"
+      class="canvas-item icon-item icon-add"
+      :class="itemClass(ADD_BTN_ID)"
+      :style="iconGridStyle(ADD_BTN_ID, store.data.addButtonGridX, store.data.addButtonGridY)"
+      @pointerdown="onAddBtnPointerDown"
+      @click="openAddModal"
+      title="Add shortcut"
+    >
+      <span class="icon-del" @click.stop="store.hideAddButton()" title="Remove">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </span>
+      <div class="icon-img-wrap icon-add-img" :style="iconImgStyle">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 5v14M5 12h14"/>
         </svg>
       </div>
       <span class="icon-label">Add</span>
@@ -891,23 +870,21 @@ onUnmounted(() => {
           <component :is="componentMap[draggingWidget.type]" />
         </div>
       </div>
-	      <div v-else-if="draggingBookmark" class="ghost-icon">
-	        <div class="icon-img-wrap" :style="iconImgStyle()">
-	          <span v-if="failedIcons.has(draggingBookmark.id)" class="icon-fallback">
-	            {{ displayName(draggingBookmark).charAt(0).toUpperCase() }}
-	          </span>
-	          <img v-else :src="faviconUrl(draggingBookmark)" :alt="draggingBookmark.name" class="icon-img" />
-	        </div>
-	        <span class="icon-label">{{ displayName(draggingBookmark) }}</span>
-	      </div>
-	      <div v-else-if="draggingId === ADD_BTN_ID" class="ghost-icon">
-	        <div class="icon-img-wrap icon-add-img" :style="iconImgStyle()">
-	          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-	            <path d="M12 5v14M5 12h14"/>
-	          </svg>
-	        </div>
-	        <span class="icon-label">Add</span>
-	      </div>
+      <div v-else-if="draggingBookmark" class="ghost-icon">
+        <BookmarkIcon
+          :bookmark="draggingBookmark"
+          :img-style="iconImgStyle"
+          :failed="failedIcons.has(draggingBookmark.id)"
+        />
+      </div>
+      <div v-else-if="draggingId === ADD_BTN_ID" class="ghost-icon">
+        <div class="icon-img-wrap icon-add-img" :style="iconImgStyle">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </div>
+        <span class="icon-label">Add</span>
+      </div>
     </div>
   </Teleport>
 
@@ -1029,45 +1006,6 @@ onUnmounted(() => {
 .icon-item:hover .icon-edit { opacity: 1; }
 .icon-del:hover { background: #ef4444; }
 .icon-edit:hover { background: var(--accent); }
-
-.icon-img-wrap {
-  border-radius: 14px;
-  overflow: hidden;
-  position: relative;
-  background: var(--bg-glass);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  position: absolute;
-  inset: 0;
-}
-
-.icon-fallback {
-  font-size: 1.5em;
-  font-weight: 700;
-  color: var(--text-primary);
-  opacity: 0.6;
-}
-
-.icon-label {
-  font-size: 12px;
-  color: var(--text-primary);
-  opacity: 0.85;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 90px;
-  text-align: center;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-}
 
 .icon-add-img {
   border: 2px dashed var(--border);
