@@ -6,6 +6,7 @@ export type BookmarkMenuItem = {
   title: string
   url?: string
   children?: BookmarkMenuItem[]
+  childrenLoaded?: boolean
 }
 
 defineProps<{
@@ -14,6 +15,7 @@ defineProps<{
 
 const emit = defineEmits<{
   open: [item: BookmarkMenuItem]
+  expand: [item: BookmarkMenuItem]
 }>()
 
 function itemLabel(item: BookmarkMenuItem) {
@@ -28,6 +30,10 @@ function itemLabel(item: BookmarkMenuItem) {
 
 function visibleChildren(item: BookmarkMenuItem) {
   return item.children?.filter((child) => child.title || child.url || child.children?.length) ?? []
+}
+
+function expandFolder(item: BookmarkMenuItem) {
+  emit('expand', item)
 }
 </script>
 
@@ -44,8 +50,8 @@ function visibleChildren(item: BookmarkMenuItem) {
         <span>{{ itemLabel(item) }}</span>
       </button>
 
-      <div v-else class="folder-menu-folder">
-        <button class="folder-menu-item" :title="itemLabel(item)" @click.stop>
+      <div v-else class="folder-menu-folder" @mouseenter="expandFolder(item)" @focusin="expandFolder(item)">
+        <button class="folder-menu-item" :title="itemLabel(item)" @click.stop="expandFolder(item)">
           <span class="folder-icon"></span>
           <span>{{ itemLabel(item) }}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -57,6 +63,7 @@ function visibleChildren(item: BookmarkMenuItem) {
           class="folder-submenu"
           :items="visibleChildren(item)"
           @open="emit('open', $event)"
+          @expand="emit('expand', $event)"
         />
       </div>
     </template>

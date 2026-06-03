@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 
 const store = useSettingsStore()
 const query = ref('')
 const showEngineMenu = ref(false)
+const searchRoot = ref<HTMLElement | null>(null)
+const searchInput = ref<HTMLInputElement | null>(null)
 
 const activeEngine = computed(() =>
   store.data.searchEngines.find((e) => e.id === store.data.activeEngineId) ??
@@ -43,10 +45,25 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter') doSearch()
   if (e.key === 'Escape') showEngineMenu.value = false
 }
+
+function onDocumentPointerDown(e: PointerEvent) {
+  if (!searchRoot.value?.contains(e.target as Node)) {
+    showEngineMenu.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDown, true)
+  void nextTick(() => searchInput.value?.focus())
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+})
 </script>
 
 <template>
-  <div class="search-container" :style="containerStyle">
+  <div ref="searchRoot" class="search-container" :style="containerStyle">
     <div class="search-bar glass-panel">
       <!-- Engine selector button -->
       <button
@@ -96,6 +113,7 @@ function onKeydown(e: KeyboardEvent) {
 
       <!-- Input -->
       <input
+        ref="searchInput"
         v-model="query"
         @keydown="onKeydown"
         class="search-input"

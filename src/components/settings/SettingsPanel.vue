@@ -110,6 +110,16 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
             class="slider"
           />
         </div>
+
+        <h4 style="margin-top: 20px">Performance</h4>
+        <label class="toggle-row">
+          <input
+            type="checkbox"
+            :checked="store.data.performanceMode"
+            @change="store.setPerformanceMode(($event.target as HTMLInputElement).checked)"
+          />
+          <span>Low effects mode</span>
+        </label>
       </div>
 
       <WallpaperPicker v-else-if="activeTab === 'wallpaper'" />

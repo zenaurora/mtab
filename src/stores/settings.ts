@@ -68,6 +68,7 @@ const DEFAULT_SETTINGS: Settings = {
   activeEngineId: 'google',
   searchEngines: DEFAULT_ENGINES,
   darkMode: true,
+  performanceMode: false,
   widgets: [],
   bookmarks: DEFAULT_BOOKMARKS,
   defaultBookmarkSeedVersion: 0,
@@ -368,6 +369,10 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.darkMode = !data.value.darkMode
   }
 
+  function setPerformanceMode(enabled: boolean) {
+    data.value.performanceMode = enabled
+  }
+
   function setIconSize(size: number) {
     data.value.iconSize = Math.max(40, Math.min(96, size))
   }
@@ -553,6 +558,7 @@ export const useSettingsStore = defineStore('settings', () => {
     // theme & display
     setTheme,
     toggleDarkMode,
+    setPerformanceMode,
     setIconSize,
     // config I/O
     exportConfig,

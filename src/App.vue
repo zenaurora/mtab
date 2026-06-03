@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from './stores/settings'
 import WallpaperBg from './components/WallpaperBg.vue'
 import SearchBar from './components/SearchBar.vue'
@@ -14,7 +14,18 @@ const loaded = ref(false)
 onMounted(async () => {
   await store.load()
   loaded.value = true
+  window.addEventListener('keydown', onWindowKeydown)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
+})
+
+function onWindowKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    showSettings.value = false
+  }
+}
 
 // Compute the active theme class
 const themeClass = computed(() => {
@@ -37,7 +48,11 @@ watch(
 </script>
 
 <template>
-  <div v-if="loaded" class="app-root" :class="[{ light: !store.data.darkMode }, themeClass]">
+  <div
+    v-if="loaded"
+    class="app-root"
+    :class="[{ light: !store.data.darkMode, 'performance-mode': store.data.performanceMode }, themeClass]"
+  >
     <!-- Background -->
     <WallpaperBg />
 

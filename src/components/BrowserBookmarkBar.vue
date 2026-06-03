@@ -36,24 +36,19 @@ function onDocumentPointerDown(event: PointerEvent) {
 }
 
 function loadBrowserBookmarks() {
-  if (typeof chrome === 'undefined' || !chrome.bookmarks?.getTree) {
+  if (typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
     loadLocalBookmarkPreview()
     return
   }
 
-  chrome.bookmarks.getTree((tree) => {
+  chrome.bookmarks.getChildren('1', (children) => {
     if (chrome.runtime?.lastError) {
       loadLocalBookmarkPreview()
       return
     }
 
-    const root = tree[0]
-    const bar =
-      root?.children?.find((node) => node.id === '1') ??
-      root?.children?.[0]
-
     bookmarkSource.value = 'chrome'
-    bookmarkBar.value = (bar?.children ?? []).map(normalizeChromeBookmark)
+    bookmarkBar.value = children.map(normalizeChromeBookmark)
   })
 }
 
@@ -62,7 +57,8 @@ function normalizeChromeBookmark(item: chrome.bookmarks.BookmarkTreeNode): Bookm
     id: item.id,
     title: item.title,
     url: item.url,
-    children: item.children?.map(normalizeChromeBookmark),
+    children: item.url ? undefined : item.children?.map(normalizeChromeBookmark),
+    childrenLoaded: Boolean(item.url || item.children),
   }
 }
 
@@ -72,7 +68,26 @@ function loadLocalBookmarkPreview() {
     id: item.id,
     title: item.name,
     url: item.url,
+    childrenLoaded: true,
   }))
+}
+
+function loadFolderChildren(item: BookmarkBarItem) {
+  if (item.url || item.childrenLoaded) return
+  if (bookmarkSource.value !== 'chrome' || typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
+    item.children = []
+    item.childrenLoaded = true
+    return
+  }
+
+  item.childrenLoaded = true
+  chrome.bookmarks.getChildren(item.id, (children) => {
+    if (chrome.runtime?.lastError) {
+      item.children = []
+      return
+    }
+    item.children = children.map(normalizeChromeBookmark)
+  })
 }
 
 function itemLabel(item: BookmarkBarItem) {
@@ -92,7 +107,8 @@ function openBookmark(item: BookmarkBarItem) {
 }
 
 function toggleFolder(item: BookmarkBarItem) {
-  if (!item.children?.length) return
+  if (item.url) return
+  loadFolderChildren(item)
   openFolderId.value = openFolderId.value === item.id ? null : item.id
 }
 </script>
@@ -129,11 +145,12 @@ function toggleFolder(item: BookmarkBarItem) {
           </svg>
         </button>
         <BookmarkFolderMenu
-          v-if="item.children?.length"
+          v-if="item.childrenLoaded"
           class="folder-menu"
           :class="{ 'is-open': openFolderId === item.id }"
-          :items="item.children"
+          :items="item.children ?? []"
           @open="openBookmark"
+          @expand="loadFolderChildren"
         />
       </div>
     </template>

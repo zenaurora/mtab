@@ -48,12 +48,19 @@ type BookmarkPositionPatch = {
   gridY: number
 }
 
+type DropPlan = {
+  patches: BookmarkPositionPatch[]
+  occupied: boolean
+}
+
 // ── Grid snap state ──────────────────────────────────────────
 const snapGridX = ref(0)
 const snapGridY = ref(0)
 const dragStartGridX = ref(0)
 const dragStartGridY = ref(0)
 const previewPositions = ref<Record<string, { gridX: number; gridY: number }>>({})
+let dragSnapshot: OccupancySnapshot | null = null
+let lastDropPlan: DropPlan | null = null
 
 // ── Computed ─────────────────────────────────────────────────
 const draggingWidget = computed(() =>
@@ -149,6 +156,13 @@ function buildOccupancySnapshot(excludeId?: string): OccupancySnapshot {
   return { bookmarks, widgetCells }
 }
 
+function cloneOccupancySnapshot(snapshot: OccupancySnapshot): OccupancySnapshot {
+  return {
+    bookmarks: new Map(snapshot.bookmarks),
+    widgetCells: new Set(snapshot.widgetCells),
+  }
+}
+
 function isOccupiedInSnapshot(snapshot: OccupancySnapshot, col: number, row: number): boolean {
   const key = cellKey(col, row)
   return snapshot.bookmarks.has(key) || snapshot.widgetCells.has(key)
@@ -169,12 +183,10 @@ function isAreaOccupiedInSnapshot(
   return false
 }
 
-function updateDropIndicatorDom(col: number, row: number) {
+function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
   const el = dropIndicatorEl.value
   if (!el) return
 
-  const snapshot = buildOccupancySnapshot(draggingId.value ?? undefined)
-  const occupied = isAreaOccupiedInSnapshot(snapshot, col, row, 1, 1)
   const cell = gridCellSize()
 
   el.style.width = `${dragW.value || cell}px`
@@ -214,6 +226,8 @@ function onWidgetPointerDown(e: PointerEvent, widgetId: string, gx: number, gy: 
   dragH.value = gh * cell
   startX.value = e.clientX
   startY.value = e.clientY
+  dragSnapshot = buildOccupancySnapshot(widgetId)
+  lastDropPlan = null
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
@@ -239,6 +253,8 @@ function onIconPointerDown(e: PointerEvent, bm: Bookmark) {
   dragH.value = rect.height
   startX.value = e.clientX
   startY.value = e.clientY
+  dragSnapshot = buildOccupancySnapshot(bm.id)
+  lastDropPlan = null
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
@@ -263,6 +279,8 @@ function onAddBtnPointerDown(e: PointerEvent) {
   dragH.value = rect.height
   startX.value = e.clientX
   startY.value = e.clientY
+  dragSnapshot = buildOccupancySnapshot(ADD_BTN_ID)
+  lastDropPlan = null
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
@@ -283,12 +301,12 @@ function onPointerMove(e: PointerEvent) {
     snapGridY.value = snap.gridY
     lastSnapGridX = snapGridX.value
     lastSnapGridY = snapGridY.value
-    updatePreviewPositions(snapGridX.value, snapGridY.value)
+    const plan = updatePreviewPositions(snapGridX.value, snapGridY.value)
     nextTick(() => {
       if (ghostEl.value) {
         ghostEl.value.style.transform = `translate3d(${ghostXRaw}px, ${ghostYRaw}px, 0) scale(1.05)`
       }
-      updateDropIndicatorDom(snapGridX.value, snapGridY.value)
+      updateDropIndicatorDom(snapGridX.value, snapGridY.value, plan.occupied)
     })
   }
 
@@ -314,8 +332,8 @@ function onPointerMove(e: PointerEvent) {
       lastSnapGridY = newSy
       snapGridX.value = newSx
       snapGridY.value = newSy
-      updatePreviewPositions(newSx, newSy)
-      updateDropIndicatorDom(newSx, newSy)
+      const plan = updatePreviewPositions(newSx, newSy)
+      updateDropIndicatorDom(newSx, newSy, plan.occupied)
     }
   })
 }
@@ -332,7 +350,9 @@ function onWindowPointerUp() {
 
 // ── Collision detection ──────────────────────────────────────
 function findFreePosition(gx: number, gy: number, gridW: number, gridH: number, excludeId?: string) {
-  const snapshot = buildOccupancySnapshot(excludeId)
+  const snapshot = dragSnapshot && excludeId === draggingId.value
+    ? dragSnapshot
+    : buildOccupancySnapshot(excludeId)
   return findFreePositionInSnapshot(snapshot, gx, gy, gridW, gridH)
 }
 
@@ -414,24 +434,25 @@ function planCascadeShift(
   moveBookmarkInSnapshot(snapshot, patches, bm, targetCol, targetRow)
 }
 
-function planIconDrop(id: string, rawX: number, rawY: number): BookmarkPositionPatch[] {
-  const snapshot = buildOccupancySnapshot(id)
+function planIconDrop(id: string, rawX: number, rawY: number, baseSnapshot = dragSnapshot): DropPlan {
+  const snapshot = cloneOccupancySnapshot(baseSnapshot ?? buildOccupancySnapshot(id))
   const occupant = snapshot.bookmarks.get(cellKey(rawX, rawY))
   const widgetBlocker = snapshot.widgetCells.has(cellKey(rawX, rawY))
+  const occupied = Boolean(occupant || widgetBlocker)
 
   if (occupant) {
     const patches: BookmarkPositionPatch[] = []
     planCascadeShift(snapshot, rawX, rawY, dragStartGridX.value, dragStartGridY.value, patches)
     patches.push({ id, gridX: rawX, gridY: rawY })
-    return patches
+    return { patches, occupied }
   }
 
   if (widgetBlocker) {
     const pos = findFreePositionInSnapshot(snapshot, rawX, rawY, 1, 1)
-    return [{ id, gridX: pos.gridX, gridY: pos.gridY }]
+    return { patches: [{ id, gridX: pos.gridX, gridY: pos.gridY }], occupied }
   }
 
-  return [{ id, gridX: rawX, gridY: rawY }]
+  return { patches: [{ id, gridX: rawX, gridY: rawY }], occupied }
 }
 
 function commitIconPatches(patches: BookmarkPositionPatch[]) {
@@ -480,17 +501,21 @@ function resolvePatchCollisions(patches: BookmarkPositionPatch[]) {
   return result
 }
 
-function updatePreviewPositions(rawX: number, rawY: number) {
+function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
   if (dragKind.value !== 'icon' || !draggingId.value) {
     previewPositions.value = {}
-    return
+    lastDropPlan = { patches: [], occupied: false }
+    return lastDropPlan
   }
 
+  const plan = planIconDrop(draggingId.value, rawX, rawY)
   const next: Record<string, { gridX: number; gridY: number }> = {}
-  for (const patch of planIconDrop(draggingId.value, rawX, rawY)) {
+  for (const patch of plan.patches) {
     next[patch.id] = { gridX: patch.gridX, gridY: patch.gridY }
   }
   previewPositions.value = next
+  lastDropPlan = plan
+  return plan
 }
 
 // ── Pointer up (drop) ────────────────────────────────────────
@@ -518,8 +543,8 @@ function onPointerUp() {
 	    markInstantMove(draggingId.value)
 	    store.moveWidget(draggingId.value, pos.gridX, pos.gridY)
 	  } else if (dragKind.value === 'icon' && draggingId.value) {
-	    const patches = planIconDrop(draggingId.value, rawX, rawY)
-	    commitIconPatches(patches)
+	    const plan = lastDropPlan ?? planIconDrop(draggingId.value, rawX, rawY)
+	    commitIconPatches(plan.patches)
 	  }
   resetDrag()
 }
@@ -533,6 +558,8 @@ function resetDrag() {
 	  pendingDrag.value = false
 	  draggingId.value = null
 	  previewPositions.value = {}
+	  dragSnapshot = null
+	  lastDropPlan = null
 	}
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -562,12 +589,14 @@ const showModal = ref(false)
 const editingId = ref<string | null>(null)
 const modalName = ref('')
 const modalUrl = ref('')
+const modalIconUrl = ref('')
 
 function openAddModal() {
   if (justDragged) return
   editingId.value = null
   modalName.value = ''
   modalUrl.value = ''
+  modalIconUrl.value = ''
   showModal.value = true
 }
 
@@ -575,20 +604,32 @@ function openEditModal(bm: Bookmark) {
   editingId.value = bm.id
   modalName.value = bm.name
   modalUrl.value = bm.url
+  modalIconUrl.value = bm.iconUrl ?? ''
   showModal.value = true
 }
 
 function closeModal() { showModal.value = false }
 
+function onModalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && showModal.value) {
+    closeModal()
+  }
+}
+
 function submitModal() {
   let url = modalUrl.value.trim()
+  let iconUrl = modalIconUrl.value.trim()
   if (!url) return
   if (!/^https?:\/\//.test(url)) url = 'https://' + url
+  if (iconUrl && !/^https?:\/\//.test(iconUrl) && !/^data:image\//.test(iconUrl)) {
+    iconUrl = 'https://' + iconUrl
+  }
   const name = modalName.value.trim() || extractDomain(url)
+  const patch = { name, url, iconUrl: iconUrl || undefined }
   if (editingId.value) {
-    store.updateBookmark(editingId.value, { name, url })
+    store.updateBookmark(editingId.value, patch)
   } else {
-    store.addBookmark({ name, url })
+    store.addBookmark(patch)
   }
   closeModal()
 }
@@ -600,11 +641,13 @@ const componentMap: Record<string, typeof ClockWidget> = {
 onMounted(() => {
   window.addEventListener('pointermove', onWindowPointerMove)
   window.addEventListener('pointerup', onWindowPointerUp)
+  window.addEventListener('keydown', onModalKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('pointermove', onWindowPointerMove)
   window.removeEventListener('pointerup', onWindowPointerUp)
+  window.removeEventListener('keydown', onModalKeydown)
 })
 </script>
 
@@ -745,6 +788,10 @@ onUnmounted(() => {
           <div class="modal-field">
             <label>URL</label>
             <input v-model="modalUrl" placeholder="github.com" @keydown.enter="submitModal" autofocus />
+          </div>
+          <div class="modal-field">
+            <label>Icon URL (optional)</label>
+            <input v-model="modalIconUrl" placeholder="https://example.com/favicon.ico" @keydown.enter="submitModal" />
           </div>
           <div class="modal-actions">
             <button @click="closeModal">Cancel</button>

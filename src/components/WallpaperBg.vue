@@ -22,7 +22,7 @@ const bgStyle = computed(() => {
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
-    filter: `blur(${store.data.blurAmount}px)`,
+    filter: store.data.performanceMode ? 'none' : `blur(${store.data.blurAmount}px)`,
     transform: 'scale(1.05)', // prevent blur edge artifacts
   }
 })

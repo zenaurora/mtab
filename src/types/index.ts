@@ -84,6 +84,7 @@ export interface Settings {
 
   // Theme
   darkMode: boolean
+  performanceMode: boolean
 
   // Widgets
   widgets: Widget[]
