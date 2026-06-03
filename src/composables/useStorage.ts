@@ -15,7 +15,7 @@ export function useStorage<T>(key: string, defaultValue: T, serializeValue: (val
   save: () => Promise<void>
   load: () => Promise<void>
 } {
-  const data = ref<T>(defaultValue) as Ref<T>
+  const data = ref<T>(cloneValue(defaultValue)) as Ref<T>
   const ready = ref(false)
 
   async function load() {
@@ -23,12 +23,12 @@ export function useStorage<T>(key: string, defaultValue: T, serializeValue: (val
       if (isChromeExtension) {
         const result = await chrome.storage.local.get(key)
         if (result[key] !== undefined) {
-          data.value = result[key] as T
+          data.value = mergeDefaultValue(defaultValue, result[key]) as T
         }
       } else {
         const stored = localStorage.getItem(key)
         if (stored !== null) {
-          data.value = JSON.parse(stored) as T
+          data.value = mergeDefaultValue(defaultValue, JSON.parse(stored)) as T
         }
       }
     } catch (e) {
@@ -64,6 +64,27 @@ export function useStorage<T>(key: string, defaultValue: T, serializeValue: (val
   )
 
   return { data, ready, save, load }
+}
+
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function mergeDefaultValue<T>(defaultValue: T, storedValue: unknown): T {
+  if (
+    defaultValue &&
+    typeof defaultValue === 'object' &&
+    !Array.isArray(defaultValue) &&
+    storedValue &&
+    typeof storedValue === 'object' &&
+    !Array.isArray(storedValue)
+  ) {
+    return {
+      ...(cloneValue(defaultValue) as Record<string, unknown>),
+      ...(storedValue as Record<string, unknown>),
+    } as T
+  }
+  return storedValue as T
 }
 
 export async function loadStorageValue<T>(key: string): Promise<T | undefined> {

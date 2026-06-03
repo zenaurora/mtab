@@ -77,10 +77,11 @@ export const useSettingsStore = defineStore('settings', () => {
   )
 
   function sanitizeForStorage(settings: Settings): Settings {
+    const wallpaperHistory = Array.isArray(settings.wallpaperHistory) ? settings.wallpaperHistory : []
     return {
       ...settings,
       wallpaperBase64: '',
-      wallpaperHistory: settings.wallpaperHistory.map((entry) =>
+      wallpaperHistory: wallpaperHistory.map((entry) =>
         entry.sourceType === 'base64'
           ? { ...entry, source: LOCAL_WALLPAPER_SOURCE }
           : entry
@@ -375,6 +376,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // ── Migration ──────────────────────────────────────────
   function migrateBookmarkPositions() {
+    normalizeSettingsShape()
+
     data.value.showAddButton ??= true
     data.value.addButtonGridX ??= 10
     data.value.addButtonGridY ??= 6
@@ -397,6 +400,21 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     normalizeLayoutPositions()
+  }
+
+  function normalizeSettingsShape() {
+    if (!Array.isArray(data.value.searchEngines) || data.value.searchEngines.length === 0) {
+      data.value.searchEngines = [...DEFAULT_ENGINES]
+    }
+    if (!Array.isArray(data.value.widgets)) {
+      data.value.widgets = []
+    }
+    if (!Array.isArray(data.value.bookmarks)) {
+      data.value.bookmarks = [...DEFAULT_BOOKMARKS.map((bm) => ({ ...bm }))]
+    }
+    if (!Array.isArray(data.value.wallpaperHistory)) {
+      data.value.wallpaperHistory = []
+    }
   }
 
   function normalizeLayoutPositions() {
