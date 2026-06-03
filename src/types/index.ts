@@ -51,8 +51,6 @@ export interface Bookmark {
 // Wallpaper history entry
 export interface WallpaperEntry {
   id: string
-  // Preview image: base64 thumbnail or URL
-  thumbnail: string
   // Source: the actual wallpaper (base64 full or URL)
   source: string
   sourceType: 'url' | 'base64' | 'wallhaven'

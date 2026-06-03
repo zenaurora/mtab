@@ -102,11 +102,13 @@ export const useSettingsStore = defineStore('settings', () => {
     return {
       ...settings,
       wallpaperBase64: '',
-      wallpaperHistory: wallpaperHistory.map((entry) =>
-        entry.sourceType === 'base64'
-          ? { ...entry, source: LOCAL_WALLPAPER_SOURCE }
-          : entry
-      ),
+      wallpaperHistory: wallpaperHistory.map((entry) => ({
+        id: entry.id,
+        source: entry.sourceType === 'base64' ? LOCAL_WALLPAPER_SOURCE : entry.source,
+        sourceType: entry.sourceType,
+        label: entry.label,
+        addedAt: entry.addedAt,
+      })),
     }
   }
 
@@ -164,11 +166,6 @@ export const useSettingsStore = defineStore('settings', () => {
   function removeFromHistory(id: string) {
     const idx = data.value.wallpaperHistory.findIndex((h) => h.id === id)
     if (idx !== -1) data.value.wallpaperHistory.splice(idx, 1)
-  }
-
-  function patchHistoryThumbnail(id: string, thumbnail: string) {
-    const entry = data.value.wallpaperHistory.find((h) => h.id === id)
-    if (entry) entry.thumbnail = thumbnail
   }
 
   function applyFromHistory(entry: WallpaperEntry) {
@@ -557,7 +554,6 @@ export const useSettingsStore = defineStore('settings', () => {
     // wallpaper history
     addToHistory,
     removeFromHistory,
-    patchHistoryThumbnail,
     applyFromHistory,
     // search bar
     setSearchBarWidth,

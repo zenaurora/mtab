@@ -7,26 +7,6 @@ const store = useSettingsStore()
 
 const imageUrl = ref(store.data.wallpaperUrl)
 
-// ── Thumbnail generator ───────────────────────────────────────
-// Resizes a dataURL to a small JPEG thumbnail (~300×169px, <30KB)
-async function makeThumbnail(dataUrl: string, maxW = 300): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      const ratio = maxW / img.width
-      const canvas = document.createElement('canvas')
-      canvas.width = maxW
-      canvas.height = Math.round(img.height * ratio)
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { resolve(dataUrl.slice(0, 200)); return }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      resolve(canvas.toDataURL('image/jpeg', 0.65))
-    }
-    img.onerror = () => resolve('')
-    img.src = dataUrl
-  })
-}
-
 // ── Solid color presets ──────────────────────────────────────
 const SOLID_COLORS = [
   '#0f0c29', '#1a1a2e', '#16213e', '#0d1b2a',
@@ -45,13 +25,10 @@ function onFileChange(e: Event) {
   const file = input.files?.[0]
   if (!file) return
   const reader = new FileReader()
-  reader.onload = async () => {
+  reader.onload = () => {
     const base64 = reader.result as string
-    // Generate a small compressed thumbnail (~30KB) — NOT the full multi-MB base64
-    const thumb = await makeThumbnail(base64)
     store.setWallpaperBase64(base64)
     store.addToHistory({
-      thumbnail: thumb,
       source: base64,
       sourceType: 'base64',
       label: file.name,
@@ -74,7 +51,6 @@ function applyUrl() {
   // Regular URL
   store.setWallpaperUrl(url)
   store.addToHistory({
-    thumbnail: url,
     source: url,
     sourceType: 'url',
     label: extractLabel(url),
@@ -107,10 +83,8 @@ async function resolveWallhaven(id: string) {
     const json = await res.json()
     const wp = json.data
     if (!wp || !wp.path) throw new Error('Wallpaper not found')
-    const thumb = wp.thumbs?.small || wp.path
     store.setWallpaperUrl(wp.path)
     store.addToHistory({
-      thumbnail: thumb,
       source: wp.path,
       sourceType: 'wallhaven',
       label: `wallhaven.cc/w/${id}`,
@@ -153,7 +127,6 @@ async function searchWallhaven(random = false) {
 function applyWallhavenResult(w: { id: string; path: string; thumbs: { small: string } }) {
   store.setWallpaperUrl(w.path)
   store.addToHistory({
-    thumbnail: w.thumbs.small,
     source: w.path,
     sourceType: 'wallhaven',
     label: `wallhaven.cc/w/${w.id}`,
