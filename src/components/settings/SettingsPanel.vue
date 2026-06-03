@@ -110,15 +110,6 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
             class="slider"
           />
         </div>
-        <div class="field">
-          <label>Icon Spacing: {{ store.data.iconSpacing }}px</label>
-          <input
-            type="range" min="8" max="48" step="4"
-            :value="store.data.iconSpacing"
-            @input="store.setIconSpacing(Number(($event.target as HTMLInputElement).value))"
-            class="slider"
-          />
-        </div>
       </div>
 
       <WallpaperPicker v-else-if="activeTab === 'wallpaper'" />

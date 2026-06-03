@@ -33,7 +33,7 @@ const DEFAULT_BOOKMARKS: Bookmark[] = [
   { id: 'bm_gmail',       name: 'Gmail',       url: 'https://mail.google.com',                         gridX: 4,  gridY: 6, gridW: 1, gridH: 1 },
   { id: 'bm_bilibili',    name: 'Bilibili',    url: 'https://www.bilibili.com',                        gridX: 5,  gridY: 6, gridW: 1, gridH: 1 },
   { id: 'bm_github',      name: 'GitHub',      url: 'https://github.com',                              gridX: 6,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_xiaohongshu', name: '小红书',       url: 'https://www.xiaohongshu.com',                     gridX: 7,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_xiaohongshu', name: '小红书',       url: 'https://www.xiaohongshu.com',                     iconUrl: 'https://www.xiaohongshu.com/favicon.ico', gridX: 7,  gridY: 6, gridW: 1, gridH: 1 },
   { id: 'bm_douyin',      name: '抖音',         url: 'https://www.douyin.com',                          gridX: 8,  gridY: 6, gridW: 1, gridH: 1 },
   { id: 'bm_youtube',     name: 'YouTube',     url: 'https://www.youtube.com',                         gridX: 9,  gridY: 6, gridW: 1, gridH: 1 },
   { id: 'bm_notion',      name: 'Notion',      url: 'https://www.notion.so',                           gridX: 10, gridY: 6, gridW: 1, gridH: 1 },
@@ -45,7 +45,7 @@ const DEFAULT_BOOKMARKS: Bookmark[] = [
   { id: 'bm_kimi',        name: 'Kimi',        url: 'https://kimi.com',                                gridX: 7,  gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_zai',         name: 'Z.ai',        url: 'https://chat.z.ai',                               gridX: 8,  gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_ai_studio',   name: 'AI Studio',   url: 'https://aistudio.google.com/prompts/new_chat',     gridX: 9,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_ikuncode',    name: 'iKunCode',    url: 'https://api.ikuncode.cc',                         gridX: 10, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_ikuncode',    name: 'iKunCode',    url: 'https://api.ikuncode.cc',                         iconUrl: 'https://api.ikuncode.cc/favicon.ico', gridX: 10, gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_claude',      name: 'Claude',      url: 'https://claude.ai',                               gridX: 11, gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_gemini',      name: 'Gemini',      url: 'https://gemini.google.com',                       gridX: 12, gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_perplexity',  name: 'Perplexity',  url: 'https://www.perplexity.ai',                       gridX: 13, gridY: 7, gridW: 1, gridH: 1 },
@@ -57,7 +57,6 @@ const CURRENT_DEFAULT_BOOKMARK_SEED_VERSION = 2
 const DEFAULT_SETTINGS: Settings = {
   theme: 'default',
   iconSize: 64,
-  iconSpacing: 20,
   wallpaperUrl: '',
   wallpaperBase64: '',
   wallpaperColor: '',
@@ -373,10 +372,6 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.iconSize = Math.max(40, Math.min(96, size))
   }
 
-  function setIconSpacing(spacing: number) {
-    data.value.iconSpacing = Math.max(8, Math.min(48, spacing))
-  }
-
   // ── Export / Import ──────────────────────────────────────
   function exportConfig(): MTabConfig {
     return {
@@ -427,9 +422,16 @@ export const useSettingsStore = defineStore('settings', () => {
     if (data.value.defaultBookmarkSeedVersion >= CURRENT_DEFAULT_BOOKMARK_SEED_VERSION) return
 
     const existingIds = new Set(data.value.bookmarks.map((bm) => bm.id))
+    const defaultById = new Map(DEFAULT_BOOKMARKS.map((bm) => [bm.id, bm]))
     for (const bm of DEFAULT_BOOKMARKS) {
       if (!existingIds.has(bm.id)) {
         data.value.bookmarks.push({ ...bm })
+      }
+    }
+    for (const bm of data.value.bookmarks) {
+      const defaultBookmark = defaultById.get(bm.id)
+      if (defaultBookmark?.iconUrl && !bm.iconUrl) {
+        bm.iconUrl = defaultBookmark.iconUrl
       }
     }
     data.value.defaultBookmarkSeedVersion = CURRENT_DEFAULT_BOOKMARK_SEED_VERSION
@@ -552,7 +554,6 @@ export const useSettingsStore = defineStore('settings', () => {
     setTheme,
     toggleDarkMode,
     setIconSize,
-    setIconSpacing,
     // config I/O
     exportConfig,
     importConfig,

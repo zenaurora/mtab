@@ -9,7 +9,6 @@ import BookmarkWidget from './widgets/BookmarkWidget.vue'
 
 const store = useSettingsStore()
 
-const CELL = 96
 const DRAG_THRESHOLD = 6
 const ADD_BTN_ID = '__add_btn__'
 
@@ -69,14 +68,23 @@ const draggingBookmark = computed(() =>
     : null
 )
 
+const cellSize = computed(() =>
+  Math.max(96, store.data.iconSize + 28)
+)
+
+function gridCellSize() {
+  return cellSize.value
+}
+
 function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
+  const cell = gridCellSize()
   return {
     position: 'absolute' as const,
     left: '0',
     top: '0',
-    width: `${gridW * CELL}px`,
-    height: `${gridH * CELL}px`,
-    transform: `translate3d(${gridX * CELL}px, ${gridY * CELL}px, 0)`,
+    width: `${gridW * cell}px`,
+    height: `${gridH * cell}px`,
+    transform: `translate3d(${gridX * cell}px, ${gridY * cell}px, 0)`,
   }
 }
 
@@ -167,18 +175,20 @@ function updateDropIndicatorDom(col: number, row: number) {
 
   const snapshot = buildOccupancySnapshot(draggingId.value ?? undefined)
   const occupied = isAreaOccupiedInSnapshot(snapshot, col, row, 1, 1)
+  const cell = gridCellSize()
 
-  el.style.width = `${dragW.value || CELL}px`
-  el.style.height = `${dragH.value || CELL}px`
-  el.style.transform = `translate3d(${col * CELL}px, ${row * CELL}px, 0)`
+  el.style.width = `${dragW.value || cell}px`
+  el.style.height = `${dragH.value || cell}px`
+  el.style.transform = `translate3d(${col * cell}px, ${row * cell}px, 0)`
   el.style.borderColor = occupied ? 'rgba(239, 68, 68, 0.6)' : 'var(--accent)'
   el.style.background = occupied ? 'rgba(239, 68, 68, 0.06)' : 'rgba(99, 102, 241, 0.06)'
 }
 
 function pointerToGrid(x: number, y: number) {
+  const cell = gridCellSize()
   return {
-    gridX: Math.max(0, Math.round((x + dragW.value / 2 - CELL / 2) / CELL)),
-    gridY: Math.max(0, Math.round((y + dragH.value / 2 - CELL / 2) / CELL)),
+    gridX: Math.max(0, Math.round((x + dragW.value / 2 - cell / 2) / cell)),
+    gridY: Math.max(0, Math.round((y + dragH.value / 2 - cell / 2) / cell)),
   }
 }
 
@@ -199,8 +209,9 @@ function onWidgetPointerDown(e: PointerEvent, widgetId: string, gx: number, gy: 
   ghostYRaw = rect.top
   dragOffsetX.value = e.clientX - rect.left
   dragOffsetY.value = e.clientY - rect.top
-  dragW.value = gw * CELL
-  dragH.value = gh * CELL
+  const cell = gridCellSize()
+  dragW.value = gw * cell
+  dragH.value = gh * cell
   startX.value = e.clientX
   startY.value = e.clientY
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -525,8 +536,13 @@ function resetDrag() {
 	}
 
 // ── Helpers ──────────────────────────────────────────────────
-function faviconUrl(url: string): string {
-  try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128` } catch { return '' }
+function faviconUrl(bookmark: Bookmark): string {
+  if (bookmark.iconUrl) return bookmark.iconUrl
+  try {
+    return `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=128`
+  } catch {
+    return ''
+  }
 }
 
 function extractDomain(url: string): string {
@@ -642,7 +658,7 @@ onUnmounted(() => {
         </span>
         <img
           v-else
-          :src="faviconUrl(bm.url)"
+          :src="faviconUrl(bm)"
           :alt="bm.name"
           class="icon-img"
           @load="loadedIcons.add(bm.id); failedIcons.delete(bm.id)"
@@ -701,7 +717,7 @@ onUnmounted(() => {
 	          <span v-if="failedIcons.has(draggingBookmark.id)" class="icon-fallback">
 	            {{ displayName(draggingBookmark).charAt(0).toUpperCase() }}
 	          </span>
-	          <img v-else :src="faviconUrl(draggingBookmark.url)" :alt="draggingBookmark.name" class="icon-img" />
+	          <img v-else :src="faviconUrl(draggingBookmark)" :alt="draggingBookmark.name" class="icon-img" />
 	        </div>
 	        <span class="icon-label">{{ displayName(draggingBookmark) }}</span>
 	      </div>

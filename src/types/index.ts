@@ -67,7 +67,6 @@ export interface Settings {
 
   // Desktop icons
   iconSize: number      // 40-96 px
-  iconSpacing: number   // 8-40 px
 
   // Wallpaper
   wallpaperUrl: string

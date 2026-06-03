@@ -5,9 +5,10 @@ import { useSettingsStore } from '../../stores/settings'
 const store = useSettingsStore()
 const bookmarks = computed(() => store.data.bookmarks)
 
-function faviconUrl(url: string): string {
+function faviconUrl(bookmark: { url: string; iconUrl?: string }): string {
+  if (bookmark.iconUrl) return bookmark.iconUrl
   try {
-    const domain = new URL(url).hostname
+    const domain = new URL(bookmark.url).hostname
     return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
   } catch {
     return ''
@@ -52,8 +53,8 @@ function navigate(url: string) {
         :title="bm.url"
       >
         <img
-          v-if="faviconUrl(bm.url)"
-          :src="faviconUrl(bm.url)"
+          v-if="faviconUrl(bm)"
+          :src="faviconUrl(bm)"
           :alt="bm.name"
           class="favicon"
           @error="($event.target as HTMLImageElement).style.display = 'none'"
