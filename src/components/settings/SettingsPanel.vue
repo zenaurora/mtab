@@ -154,6 +154,10 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
 
       <!-- Bookmarks tab -->
       <div v-else-if="activeTab === 'bookmarks'" class="bookmarks-tab">
+        <label class="toggle-row">
+          <input type="checkbox" v-model="store.data.showBrowserBookmarkBar" />
+          <span>Show browser bookmarks bar</span>
+        </label>
         <h4>Add Bookmark</h4>
 	        <div class="bm-form">
 	          <input v-model="bmName" placeholder="Name (optional)" />
@@ -318,6 +322,18 @@ h4 {
 
 .bm-form .primary {
   align-self: flex-start;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.toggle-row input {
+  width: auto;
 }
 
 .bm-label {

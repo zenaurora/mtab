@@ -30,12 +30,29 @@ const DEFAULT_ENGINES: SearchEngine[] = [
 ]
 
 const DEFAULT_BOOKMARKS: Bookmark[] = [
-  { id: 'bm_gmail',    name: 'Gmail',    url: 'https://mail.google.com',  gridX: 5, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_bilibili', name: 'Bilibili', url: 'https://www.bilibili.com', gridX: 6, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_github',  name: 'GitHub',   url: 'https://github.com',      gridX: 7, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_chatgpt', name: 'ChatGPT',  url: 'https://chatgpt.com',     gridX: 8, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_deepseek',name: 'DeepSeek', url: 'https://chat.deepseek.com',gridX: 9, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_gmail',       name: 'Gmail',       url: 'https://mail.google.com',                         gridX: 4,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_bilibili',    name: 'Bilibili',    url: 'https://www.bilibili.com',                        gridX: 5,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_github',      name: 'GitHub',      url: 'https://github.com',                              gridX: 6,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_xiaohongshu', name: '小红书',       url: 'https://www.xiaohongshu.com',                     gridX: 7,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_douyin',      name: '抖音',         url: 'https://www.douyin.com',                          gridX: 8,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_youtube',     name: 'YouTube',     url: 'https://www.youtube.com',                         gridX: 9,  gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_notion',      name: 'Notion',      url: 'https://www.notion.so',                           gridX: 10, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_vercel',      name: 'Vercel',      url: 'https://vercel.com',                              gridX: 11, gridY: 6, gridW: 1, gridH: 1 },
+
+  { id: 'bm_chatgpt',     name: 'ChatGPT',     url: 'https://chatgpt.com',                             gridX: 4,  gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_deepseek',    name: 'DeepSeek',    url: 'https://chat.deepseek.com',                       gridX: 5,  gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_qwen',        name: 'Qwen',        url: 'https://chat.qwen.ai',                            gridX: 6,  gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_kimi',        name: 'Kimi',        url: 'https://kimi.com',                                gridX: 7,  gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_zai',         name: 'Z.ai',        url: 'https://chat.z.ai',                               gridX: 8,  gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_ai_studio',   name: 'AI Studio',   url: 'https://aistudio.google.com/prompts/new_chat',     gridX: 9,  gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_ikuncode',    name: 'iKunCode',    url: 'https://api.ikuncode.cc',                         gridX: 10, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_claude',      name: 'Claude',      url: 'https://claude.ai',                               gridX: 11, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_gemini',      name: 'Gemini',      url: 'https://gemini.google.com',                       gridX: 12, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_perplexity',  name: 'Perplexity',  url: 'https://www.perplexity.ai',                       gridX: 13, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_doubao',      name: '豆包',         url: 'https://www.doubao.com',                          gridX: 14, gridY: 7, gridW: 1, gridH: 1 },
 ]
+
+const CURRENT_DEFAULT_BOOKMARK_SEED_VERSION = 2
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'default',
@@ -54,9 +71,11 @@ const DEFAULT_SETTINGS: Settings = {
   darkMode: true,
   widgets: [],
   bookmarks: DEFAULT_BOOKMARKS,
+  defaultBookmarkSeedVersion: 0,
+  showBrowserBookmarkBar: true,
   showAddButton: true,
-  addButtonGridX: 10,
-  addButtonGridY: 6,
+  addButtonGridX: 15,
+  addButtonGridY: 7,
   notesContent: '',
 }
 
@@ -377,10 +396,12 @@ export const useSettingsStore = defineStore('settings', () => {
   // ── Migration ──────────────────────────────────────────
   function migrateBookmarkPositions() {
     normalizeSettingsShape()
+    seedDefaultBookmarks()
 
     data.value.showAddButton ??= true
-    data.value.addButtonGridX ??= 10
-    data.value.addButtonGridY ??= 6
+    data.value.showBrowserBookmarkBar ??= true
+    data.value.addButtonGridX ??= 15
+    data.value.addButtonGridY ??= 7
 
     let startX = 5
     let startY = 6
@@ -400,6 +421,18 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     normalizeLayoutPositions()
+  }
+
+  function seedDefaultBookmarks() {
+    if (data.value.defaultBookmarkSeedVersion >= CURRENT_DEFAULT_BOOKMARK_SEED_VERSION) return
+
+    const existingIds = new Set(data.value.bookmarks.map((bm) => bm.id))
+    for (const bm of DEFAULT_BOOKMARKS) {
+      if (!existingIds.has(bm.id)) {
+        data.value.bookmarks.push({ ...bm })
+      }
+    }
+    data.value.defaultBookmarkSeedVersion = CURRENT_DEFAULT_BOOKMARK_SEED_VERSION
   }
 
   function normalizeSettingsShape() {

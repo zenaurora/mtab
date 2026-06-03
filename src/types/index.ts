@@ -91,6 +91,10 @@ export interface Settings {
 
   // Bookmarks
   bookmarks: Bookmark[]
+  defaultBookmarkSeedVersion: number
+
+  // Chrome bookmarks bar mirror
+  showBrowserBookmarkBar: boolean
 
   // Add shortcut desktop item
   showAddButton: boolean

@@ -4,6 +4,7 @@ import { useSettingsStore } from './stores/settings'
 import WallpaperBg from './components/WallpaperBg.vue'
 import SearchBar from './components/SearchBar.vue'
 import DesktopCanvas from './components/DesktopCanvas.vue'
+import BrowserBookmarkBar from './components/BrowserBookmarkBar.vue'
 import SettingsPanel from './components/settings/SettingsPanel.vue'
 
 const store = useSettingsStore()
@@ -42,6 +43,9 @@ watch(
 
     <!-- Search bar -->
     <SearchBar />
+
+    <!-- Browser bookmark bar mirror -->
+    <BrowserBookmarkBar />
 
     <!-- Desktop canvas: widgets + icons on a free grid -->
     <DesktopCanvas />
