@@ -94,7 +94,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const { data, ready, load, save } = useStorage<Settings>(
     SETTINGS_KEY,
     { ...DEFAULT_SETTINGS },
-    sanitizeForStorage
+    sanitizeForStorage,
+    cleanupLegacyLargeStorage
   )
 
   function sanitizeForStorage(settings: Settings): Settings {

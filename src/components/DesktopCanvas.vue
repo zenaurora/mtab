@@ -30,6 +30,8 @@ const dragW = ref(0)
 const dragH = ref(0)
 const ghostEl = ref<HTMLElement | null>(null)
 const dropIndicatorEl = ref<HTMLElement | null>(null)
+const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
+const viewportHeight = ref(typeof window === 'undefined' ? 900 : window.innerHeight)
 let rafId = 0
 let justDragged = false
 let lastSnapGridX = -1
@@ -79,19 +81,38 @@ const cellSize = computed(() =>
   Math.max(96, store.data.iconSize + 28)
 )
 
+const canvasOffset = computed(() => {
+  const cell = gridCellSize()
+  const paddingX = viewportWidth.value < 720 ? 12 : 24
+  const topReserved = store.data.showBrowserBookmarkBar ? 42 : 12
+  const paddingY = Math.max(topReserved, viewportHeight.value < 640 ? 10 : 24)
+  const defaultStartX = 4
+  const defaultStartY = 6
+  const defaultCols = viewportWidth.value < 900 ? 4 : 8
+  const defaultRows = 2
+  const layoutW = defaultCols * cell
+  const layoutH = defaultRows * cell
+
+  return {
+    x: Math.max(paddingX, Math.floor((viewportWidth.value - layoutW) / 2)) - defaultStartX * cell,
+    y: Math.max(paddingY, Math.floor((viewportHeight.value - layoutH) / 2)) - defaultStartY * cell,
+  }
+})
+
 function gridCellSize() {
   return cellSize.value
 }
 
 function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
   const cell = gridCellSize()
+  const offset = canvasOffset.value
   return {
     position: 'absolute' as const,
     left: '0',
     top: '0',
     width: `${gridW * cell}px`,
     height: `${gridH * cell}px`,
-    transform: `translate3d(${gridX * cell}px, ${gridY * cell}px, 0)`,
+    transform: `translate3d(${offset.x + gridX * cell}px, ${offset.y + gridY * cell}px, 0)`,
   }
 }
 
@@ -188,20 +209,27 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
   if (!el) return
 
   const cell = gridCellSize()
+  const offset = canvasOffset.value
 
   el.style.width = `${dragW.value || cell}px`
   el.style.height = `${dragH.value || cell}px`
-  el.style.transform = `translate3d(${col * cell}px, ${row * cell}px, 0)`
+  el.style.transform = `translate3d(${offset.x + col * cell}px, ${offset.y + row * cell}px, 0)`
   el.style.borderColor = occupied ? 'rgba(239, 68, 68, 0.6)' : 'var(--accent)'
   el.style.background = occupied ? 'rgba(239, 68, 68, 0.06)' : 'rgba(99, 102, 241, 0.06)'
 }
 
 function pointerToGrid(x: number, y: number) {
   const cell = gridCellSize()
+  const offset = canvasOffset.value
   return {
-    gridX: Math.max(0, Math.round((x + dragW.value / 2 - cell / 2) / cell)),
-    gridY: Math.max(0, Math.round((y + dragH.value / 2 - cell / 2) / cell)),
+    gridX: Math.max(0, Math.round((x - offset.x + dragW.value / 2 - cell / 2) / cell)),
+    gridY: Math.max(0, Math.round((y - offset.y + dragH.value / 2 - cell / 2) / cell)),
   }
+}
+
+function updateViewportSize() {
+  viewportWidth.value = window.innerWidth
+  viewportHeight.value = window.innerHeight
 }
 
 // ── Widget pointer down ──────────────────────────────────────
@@ -546,6 +574,7 @@ function onPointerUp() {
 	    const plan = lastDropPlan ?? planIconDrop(draggingId.value, rawX, rawY)
 	    commitIconPatches(plan.patches)
 	  }
+  void store.save()
   resetDrag()
 }
 
@@ -639,12 +668,15 @@ const componentMap: Record<string, typeof ClockWidget> = {
 }
 
 onMounted(() => {
+  updateViewportSize()
+  window.addEventListener('resize', updateViewportSize)
   window.addEventListener('pointermove', onWindowPointerMove)
   window.addEventListener('pointerup', onWindowPointerUp)
   window.addEventListener('keydown', onModalKeydown)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateViewportSize)
   window.removeEventListener('pointermove', onWindowPointerMove)
   window.removeEventListener('pointerup', onWindowPointerUp)
   window.removeEventListener('keydown', onModalKeydown)

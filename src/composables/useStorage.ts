@@ -9,7 +9,12 @@ const isChromeExtension =
  * Reactive wrapper around chrome.storage.local.
  * Falls back to localStorage when not running as a Chrome extension.
  */
-export function useStorage<T>(key: string, defaultValue: T, serializeValue: (value: T) => T = (value) => value): {
+export function useStorage<T>(
+  key: string,
+  defaultValue: T,
+  serializeValue: (value: T) => T = (value) => value,
+  onSaveError?: (error: unknown) => Promise<void> | void
+): {
   data: Ref<T>
   ready: Ref<boolean>
   save: () => Promise<void>
@@ -17,6 +22,8 @@ export function useStorage<T>(key: string, defaultValue: T, serializeValue: (val
 } {
   const data = ref<T>(cloneValue(defaultValue)) as Ref<T>
   const ready = ref(false)
+  let saveInFlight: Promise<void> | null = null
+  let saveQueued = false
 
   async function load() {
     try {
@@ -38,17 +45,52 @@ export function useStorage<T>(key: string, defaultValue: T, serializeValue: (val
     }
   }
 
-  async function save() {
+  async function persistCurrentValue() {
+    // Convert Vue reactive proxies into plain JSON-compatible data before
+    // handing the payload to chrome.storage.
+    const value = cloneValue(serializeValue(data.value))
+    if (isChromeExtension) {
+      await chrome.storage.local.set({ [key]: value })
+    } else {
+      localStorage.setItem(key, JSON.stringify(value))
+    }
+  }
+
+  async function persistWithRetry() {
     try {
-      const value = serializeValue(data.value)
-      if (isChromeExtension) {
-        await chrome.storage.local.set({ [key]: value })
-      } else {
-        localStorage.setItem(key, JSON.stringify(value))
-      }
+      await persistCurrentValue()
     } catch (e) {
+      if (onSaveError) {
+        try {
+          await onSaveError(e)
+        } catch (cleanupError) {
+          console.warn(`[useStorage] Failed to run cleanup for key "${key}":`, cleanupError)
+        }
+        try {
+          await persistCurrentValue()
+          return
+        } catch (retryError) {
+          console.warn(`[useStorage] Failed to save key "${key}":`, retryError)
+          return
+        }
+      }
       console.warn(`[useStorage] Failed to save key "${key}":`, e)
     }
+  }
+
+  function save(): Promise<void> {
+    saveQueued = true
+    if (!saveInFlight) {
+      saveInFlight = (async () => {
+        while (saveQueued) {
+          saveQueued = false
+          await persistWithRetry()
+        }
+      })().finally(() => {
+        saveInFlight = null
+      })
+    }
+    return saveInFlight
   }
 
   // Auto-save on change with debounce
