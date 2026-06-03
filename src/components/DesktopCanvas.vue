@@ -35,6 +35,7 @@ let rafId = 0
 let justDragged = false
 let lastSnapGridX = -1
 let lastSnapGridY = -1
+const instantMoveIds = ref<Set<string>>(new Set())
 
 type CellKey = `${number},${number}`
 type OccupancySnapshot = {
@@ -82,6 +83,24 @@ function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
 function iconGridStyle(id: string, gridX: number, gridY: number) {
   const preview = previewPositions.value[id]
   return gridStyle(preview?.gridX ?? gridX, preview?.gridY ?? gridY)
+}
+
+function itemClass(id: string) {
+  return {
+    'is-dragging': isDragging.value && draggingId.value === id,
+    'instant-move': instantMoveIds.value.has(id),
+  }
+}
+
+function markInstantMove(id: string) {
+  instantMoveIds.value = new Set([...instantMoveIds.value, id])
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const next = new Set(instantMoveIds.value)
+      next.delete(id)
+      instantMoveIds.value = next
+    })
+  })
 }
 
 function cellKey(col: number, row: number): CellKey {
@@ -480,12 +499,13 @@ function onPointerUp() {
   const rawX = snapGridX.value
   const rawY = snapGridY.value
 
-  if (dragKind.value === 'widget' && draggingId.value) {
-    const w = store.data.widgets.find((x) => x.id === draggingId.value)
-    const gw = w?.gridW ?? 1
-    const gh = w?.gridH ?? 1
-    const pos = findFreePosition(rawX, rawY, gw, gh, draggingId.value)
-    store.moveWidget(draggingId.value, pos.gridX, pos.gridY)
+	  if (dragKind.value === 'widget' && draggingId.value) {
+	    const w = store.data.widgets.find((x) => x.id === draggingId.value)
+	    const gw = w?.gridW ?? 1
+	    const gh = w?.gridH ?? 1
+	    const pos = findFreePosition(rawX, rawY, gw, gh, draggingId.value)
+	    markInstantMove(draggingId.value)
+	    store.moveWidget(draggingId.value, pos.gridX, pos.gridY)
 	  } else if (dragKind.value === 'icon' && draggingId.value) {
 	    const patches = planIconDrop(draggingId.value, rawX, rawY)
 	    commitIconPatches(patches)
@@ -581,9 +601,9 @@ onUnmounted(() => {
     <!-- ── Widgets (free-form grid) ─────────────────────────── -->
     <div
       v-for="w in store.data.widgets"
-      :key="w.id"
-      class="canvas-item widget-item glass-panel"
-      :class="{ 'is-dragging': isDragging && draggingId === w.id }"
+	      :key="w.id"
+	      class="canvas-item widget-item glass-panel"
+	      :class="itemClass(w.id)"
       :style="gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
       @pointerdown="onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)"
     >
@@ -601,7 +621,7 @@ onUnmounted(() => {
 	      :key="bm.id"
 	      v-show="bm.gridX !== undefined && bm.gridY !== undefined"
 	      class="canvas-item icon-item"
-	      :class="{ 'is-dragging': isDragging && draggingId === bm.id }"
+	      :class="itemClass(bm.id)"
 	      :style="iconGridStyle(bm.id, bm.gridX ?? 0, bm.gridY ?? 0)"
 	      @pointerdown="onIconPointerDown($event, bm)"
     >
@@ -636,7 +656,7 @@ onUnmounted(() => {
 	    <div
 	      v-if="store.data.showAddButton"
 	      class="canvas-item icon-item icon-add"
-	      :class="{ 'is-dragging': isDragging && draggingId === ADD_BTN_ID }"
+	      :class="itemClass(ADD_BTN_ID)"
 	      :style="iconGridStyle(ADD_BTN_ID, store.data.addButtonGridX, store.data.addButtonGridY)"
 	      @pointerdown="onAddBtnPointerDown"
 	      @click="openAddModal"
@@ -736,6 +756,10 @@ onUnmounted(() => {
 }
 
 .canvas-item:active { cursor: grabbing; }
+
+.canvas-item.instant-move {
+  transition: opacity 0.15s;
+}
 
 .canvas-item.is-dragging {
   opacity: 0.15;
