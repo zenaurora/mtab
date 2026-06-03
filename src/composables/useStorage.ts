@@ -22,8 +22,8 @@ export function useStorage<T>(
 } {
   const data = ref<T>(cloneValue(defaultValue)) as Ref<T>
   const ready = ref(false)
-  let saveInFlight: Promise<void> | null = null
-  let saveQueued = false
+  let savePromise: Promise<void> | null = null
+  let needsSave = false
 
   async function load() {
     try {
@@ -56,41 +56,49 @@ export function useStorage<T>(
     }
   }
 
-  async function persistWithRetry() {
+  async function tryPersist(): Promise<unknown | null> {
     try {
       await persistCurrentValue()
+      return null
     } catch (e) {
-      if (onSaveError) {
-        try {
-          await onSaveError(e)
-        } catch (cleanupError) {
-          console.warn(`[useStorage] Failed to run cleanup for key "${key}":`, cleanupError)
-        }
-        try {
-          await persistCurrentValue()
-          return
-        } catch (retryError) {
-          console.warn(`[useStorage] Failed to save key "${key}":`, retryError)
-          return
-        }
-      }
-      console.warn(`[useStorage] Failed to save key "${key}":`, e)
+      return e
+    }
+  }
+
+  async function persistWithRetry() {
+    const firstError = await tryPersist()
+    if (firstError === null) return
+
+    if (!onSaveError) {
+      console.warn(`[useStorage] Failed to save key "${key}":`, firstError)
+      return
+    }
+
+    try {
+      await onSaveError(firstError)
+    } catch (cleanupError) {
+      console.warn(`[useStorage] Failed to run cleanup for key "${key}":`, cleanupError)
+    }
+
+    const retryError = await tryPersist()
+    if (retryError !== null) {
+      console.warn(`[useStorage] Failed to save key "${key}":`, retryError)
+    }
+  }
+
+  async function flushSaveQueue() {
+    while (needsSave) {
+      needsSave = false
+      await persistWithRetry()
     }
   }
 
   function save(): Promise<void> {
-    saveQueued = true
-    if (!saveInFlight) {
-      saveInFlight = (async () => {
-        while (saveQueued) {
-          saveQueued = false
-          await persistWithRetry()
-        }
-      })().finally(() => {
-        saveInFlight = null
-      })
-    }
-    return saveInFlight
+    needsSave = true
+    savePromise ??= flushSaveQueue().finally(() => {
+      savePromise = null
+    })
+    return savePromise
   }
 
   // Auto-save on change with debounce
@@ -100,7 +108,10 @@ export function useStorage<T>(
     () => {
       if (!ready.value) return
       if (saveTimer) clearTimeout(saveTimer)
-      saveTimer = setTimeout(save, 300)
+      saveTimer = setTimeout(() => {
+        saveTimer = null
+        void save()
+      }, 300)
     },
     { deep: true }
   )

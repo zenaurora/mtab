@@ -279,23 +279,6 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  function reorderWidgets(fromIndex: number, toIndex: number) {
-    const list = data.value.widgets
-    if (fromIndex === toIndex) return
-    if (fromIndex < 0 || fromIndex >= list.length) return
-    if (toIndex < 0 || toIndex >= list.length) return
-    const [item] = list.splice(fromIndex, 1)
-    list.splice(toIndex, 0, item)
-  }
-
-  function moveBookmark(id: string, gridX: number, gridY: number) {
-    const bm = data.value.bookmarks.find((b) => b.id === id)
-    if (bm) {
-      bm.gridX = Math.max(0, gridX)
-      bm.gridY = Math.max(0, gridY)
-    }
-  }
-
   function moveBookmarks(patches: Array<{ id: string; gridX: number; gridY: number }>) {
     if (patches.length === 0) return
     const byId = new Map(data.value.bookmarks.map((b) => [b.id, b]))
@@ -346,15 +329,6 @@ export const useSettingsStore = defineStore('settings', () => {
     if (idx !== -1) data.value.bookmarks.splice(idx, 1)
   }
 
-  function reorderBookmarks(fromIndex: number, toIndex: number) {
-    const list = data.value.bookmarks
-    if (fromIndex === toIndex) return
-    if (fromIndex < 0 || fromIndex >= list.length) return
-    if (toIndex < 0 || toIndex >= list.length) return
-    const [item] = list.splice(fromIndex, 1)
-    list.splice(toIndex, 0, item)
-  }
-
   // ── Notes ──────────────────────────────────────────────
   function setNotesContent(content: string) {
     data.value.notesContent = content
@@ -403,7 +377,6 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.addButtonGridX ??= 15
     data.value.addButtonGridY ??= 7
 
-    let startX = 5
     let startY = 6
     for (const bm of data.value.bookmarks) {
       if (bm.gridX === undefined || bm.gridY === undefined) {
@@ -412,11 +385,7 @@ export const useSettingsStore = defineStore('settings', () => {
         bm.gridY = pos.gridY
         bm.gridW = 1
         bm.gridH = 1
-        startX = pos.gridX + 1
-        if (startX > 14) {
-          startX = 5
-          startY = pos.gridY + 1
-        }
+        startY = pos.gridX >= 14 ? pos.gridY + 1 : pos.gridY
       }
     }
 
@@ -495,12 +464,17 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function cleanupLegacyLargeStorage() {
+  async function migrateLegacyWallpaperBase64() {
     const oldWallpaper = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
     if (oldWallpaper) {
       await saveLargeStorageValue(WALLPAPER_BASE64_KEY, oldWallpaper)
     }
     await removeStorageValue(WALLPAPER_BASE64_KEY)
+    return oldWallpaper
+  }
+
+  async function cleanupLegacyLargeStorage() {
+    await migrateLegacyWallpaperBase64()
     await removeStorageValue(LEGACY_SEARCH_HISTORY_KEY)
   }
 
@@ -511,13 +485,7 @@ export const useSettingsStore = defineStore('settings', () => {
       return indexedDbValue
     }
 
-    // Compatibility for old builds that tried to keep the wallpaper in chrome.storage/localStorage.
-    const oldValue = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
-    if (oldValue) {
-      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, oldValue)
-      await removeStorageValue(WALLPAPER_BASE64_KEY)
-    }
-    return oldValue
+    return migrateLegacyWallpaperBase64()
   }
 
   function findFreePositionIgnoringOccupied(occupied: Set<string>) {
@@ -568,14 +536,11 @@ export const useSettingsStore = defineStore('settings', () => {
     addWidget,
     removeWidget,
     moveWidget,
-    reorderWidgets,
     findFreePosition,
     // bookmarks
     addBookmark,
     updateBookmark,
     removeBookmark,
-    reorderBookmarks,
-    moveBookmark,
     moveBookmarks,
     moveAddButton,
     hideAddButton,
