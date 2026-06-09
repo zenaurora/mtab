@@ -2,6 +2,12 @@
 
 A customizable browser new tab page built with Vue 3, TypeScript, Vite and Manifest V3.
 
+## Docs
+
+- [Icon drag and grid notes](docs/icon-drag-grid.md)
+- [Wallpaper Blob flow](docs/wallpaper-blob-flow.md)
+- [Browser bookmark bar flow](docs/browser-bookmark-bar.md)
+
 ## Local Development
 
 ```sh

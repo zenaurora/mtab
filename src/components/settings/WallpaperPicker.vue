@@ -24,17 +24,58 @@ function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    const base64 = reader.result as string
-    store.setWallpaperBase64(base64)
-    store.addToHistory({
-      source: base64,
-      sourceType: 'base64',
-      label: file.name,
-    })
+  void applyUploadedImage(file)
+  input.value = ''
+}
+
+async function applyUploadedImage(file: File) {
+  const objectUrl = URL.createObjectURL(file)
+  try {
+    const img = await loadImage(objectUrl)
+    const blob = await resizeWallpaperImage(img, file)
+    store.setWallpaperBlob(blob)
+    store.addToHistory({ source: '', sourceType: 'base64', label: file.name })
+  } finally {
+    URL.revokeObjectURL(objectUrl)
   }
-  reader.readAsDataURL(file)
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Failed to load image'))
+    img.src = src
+  })
+}
+
+async function resizeWallpaperImage(img: HTMLImageElement, original: File): Promise<Blob> {
+  // Resize to screen resolution to avoid storing unnecessarily large images.
+  // Wallpapers never need to be larger than the physical display.
+  const maxW = screen.width * (window.devicePixelRatio || 1)
+  const maxH = screen.height * (window.devicePixelRatio || 1)
+  const scale = Math.min(maxW / img.width, maxH / img.height, 1)
+
+  if (scale >= 1) return original
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(img.width * scale)
+  canvas.height = Math.round(img.height * scale)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return original
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+  return (
+    await canvasToBlob(canvas, 'image/webp', 0.9) ??
+    await canvasToBlob(canvas, 'image/jpeg', 0.9) ??
+    original
+  )
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob(resolve, type, quality)
+  })
 }
 
 function applyUrl() {

@@ -9,8 +9,8 @@ const bgStyle = computed(() => {
   if (store.data.wallpaperColor) {
     return { background: store.data.wallpaperColor }
   }
-  // Image wallpaper
-  const src = store.data.wallpaperBase64 || store.data.wallpaperUrl
+  // Image wallpaper — prefer blob URL for local images (avoids base64 in JS heap)
+  const src = store.wallpaperBlobUrl || store.data.wallpaperUrl
   if (!src) {
     return {
       background:

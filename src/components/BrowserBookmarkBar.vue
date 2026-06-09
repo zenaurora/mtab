@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import BookmarkFolderMenu, { type BookmarkMenuItem } from './BookmarkFolderMenu.vue'
 
@@ -9,28 +9,56 @@ type BookmarkBarItem = BookmarkMenuItem
 
 const bookmarkBar = ref<BookmarkBarItem[]>([])
 const barEl = ref<HTMLElement | null>(null)
+const measureEl = ref<HTMLElement | null>(null)
 const openFolderId = ref<string | null>(null)
+const moreMenuOpen = ref(false)
+const primaryItemIds = ref<string[]>([])
+let layoutRaf = 0
+let resizeObserver: ResizeObserver | null = null
 
 const visibleItems = computed(() =>
   bookmarkBar.value.filter((item) => item.title || item.url || item.children?.length)
 )
 
 const barLabel = computed(() => 'Chrome bookmarks bar')
+const layoutKey = computed(() =>
+  visibleItems.value.map((item) => `${item.id}:${item.title}:${item.url ? 'u' : 'f'}`).join('|')
+)
+const primaryItems = computed(() => {
+  const primaryIds = new Set(primaryItemIds.value)
+  return visibleItems.value.filter((item) => primaryIds.has(item.id))
+})
+const overflowItems = computed(() => {
+  const primaryIds = new Set(primaryItemIds.value)
+  return visibleItems.value.filter((item) => !primaryIds.has(item.id))
+})
 
 onMounted(() => {
   loadBrowserBookmarks()
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
+  resizeObserver = new ResizeObserver(() => {
+    scheduleLayout()
+  })
+  if (barEl.value) resizeObserver.observe(barEl.value)
 })
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+  if (layoutRaf) cancelAnimationFrame(layoutRaf)
+  resizeObserver?.disconnect()
 })
 
 function onDocumentPointerDown(event: PointerEvent) {
   if (!barEl.value?.contains(event.target as Node)) {
     openFolderId.value = null
+    moreMenuOpen.value = false
   }
 }
+
+watch(layoutKey, () => {
+  primaryItemIds.value = visibleItems.value.map((item) => item.id)
+  scheduleLayout()
+}, { immediate: true })
 
 function loadBrowserBookmarks() {
   if (typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
@@ -111,13 +139,86 @@ function itemLabel(item: BookmarkBarItem) {
 function openBookmark(item: BookmarkBarItem) {
   if (!item.url) return
   openFolderId.value = null
+  moreMenuOpen.value = false
   window.location.href = item.url
 }
 
 function toggleFolder(item: BookmarkBarItem) {
   if (item.url) return
   loadFolderChildren(item)
+  moreMenuOpen.value = false
   openFolderId.value = openFolderId.value === item.id ? null : item.id
+}
+
+function toggleMoreMenu() {
+  openFolderId.value = null
+  moreMenuOpen.value = !moreMenuOpen.value
+}
+
+function scheduleLayout() {
+  if (layoutRaf) return
+  layoutRaf = requestAnimationFrame(() => {
+    layoutRaf = 0
+    void nextTick(recomputeVisibleItems)
+  })
+}
+
+function recomputeVisibleItems() {
+  const bar = barEl.value
+  const measure = measureEl.value
+  const items = visibleItems.value
+  if (!bar || !measure || items.length === 0) {
+    primaryItemIds.value = items.map((item) => item.id)
+    moreMenuOpen.value = false
+    return
+  }
+
+  const style = window.getComputedStyle(bar)
+  const paddingLeft = Number.parseFloat(style.paddingLeft || '0')
+  const paddingRight = Number.parseFloat(style.paddingRight || '0')
+  const gap = Number.parseFloat(style.columnGap || style.gap || '0')
+  const availableWidth = Math.max(0, bar.clientWidth - paddingLeft - paddingRight)
+
+  const widthById = new Map<string, number>()
+  measure.querySelectorAll<HTMLElement>('[data-measure-id]').forEach((el) => {
+    const id = el.dataset.measureId
+    if (!id) return
+    widthById.set(id, Math.ceil(el.getBoundingClientRect().width))
+  })
+
+  const moreWidth = Math.ceil(
+    measure.querySelector<HTMLElement>('[data-role="measure-more"]')?.getBoundingClientRect().width ?? 0
+  )
+
+  const nextPrimary: string[] = []
+  let usedWidth = 0
+
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index]
+    const itemWidth = widthById.get(item.id) ?? 0
+    const gapBeforeItem = nextPrimary.length > 0 ? gap : 0
+    const hasOverflowAfterItem = index < items.length - 1
+    const reserveMoreWidth = hasOverflowAfterItem
+      ? (nextPrimary.length > 0 || itemWidth > 0 ? gap : 0) + moreWidth
+      : 0
+
+    if (usedWidth + gapBeforeItem + itemWidth + reserveMoreWidth <= availableWidth) {
+      nextPrimary.push(item.id)
+      usedWidth += gapBeforeItem + itemWidth
+      continue
+    }
+    break
+  }
+
+  primaryItemIds.value = nextPrimary
+
+  const nextPrimarySet = new Set(nextPrimary)
+  if (openFolderId.value && !nextPrimarySet.has(openFolderId.value)) {
+    openFolderId.value = null
+  }
+  if (nextPrimary.length === items.length) {
+    moreMenuOpen.value = false
+  }
 }
 </script>
 
@@ -128,23 +229,82 @@ function toggleFolder(item: BookmarkBarItem) {
     class="browser-bookmark-bar"
     :aria-label="barLabel"
   >
-    <template v-for="item in visibleItems" :key="item.id">
-      <button
-        v-if="item.url"
-        class="bookmark-item"
-        :title="item.url"
-        @click="openBookmark(item)"
-      >
-        <span class="bookmark-dot"></span>
-        <span>{{ itemLabel(item) }}</span>
-      </button>
-
-      <div v-else class="bookmark-folder">
+    <div class="browser-bookmark-content">
+      <template v-for="item in primaryItems" :key="item.id">
         <button
+          v-if="item.url"
+          class="bookmark-item"
+          :title="item.url"
+          @click="openBookmark(item)"
+        >
+          <span class="bookmark-dot"></span>
+          <span>{{ itemLabel(item) }}</span>
+        </button>
+
+        <div v-else class="bookmark-folder">
+          <button
+            class="bookmark-item folder-trigger"
+            :class="{ active: openFolderId === item.id }"
+            :title="itemLabel(item)"
+            @click.stop="toggleFolder(item)"
+          >
+            <span class="folder-icon"></span>
+            <span>{{ itemLabel(item) }}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <BookmarkFolderMenu
+            v-if="item.childrenLoaded"
+            class="folder-menu"
+            :class="{ 'is-open': openFolderId === item.id }"
+            :items="item.children ?? []"
+            @open="openBookmark"
+            @expand="loadFolderChildren"
+          />
+        </div>
+      </template>
+    </div>
+
+    <div v-if="overflowItems.length" class="bookmark-folder more-folder">
+      <button
+        class="bookmark-item more-trigger"
+        :class="{ active: moreMenuOpen }"
+        title="More bookmarks"
+        aria-label="More bookmarks"
+        @click.stop="toggleMoreMenu"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="5" cy="12" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="19" cy="12" r="1.5" />
+        </svg>
+      </button>
+      <BookmarkFolderMenu
+        class="folder-menu more-menu"
+        :class="{ 'is-open': moreMenuOpen }"
+        :items="overflowItems"
+        @open="openBookmark"
+        @expand="loadFolderChildren"
+      />
+    </div>
+
+    <div ref="measureEl" class="bookmark-measure" aria-hidden="true">
+      <template v-for="item in visibleItems" :key="`measure-${item.id}`">
+        <button
+          v-if="item.url"
+          class="bookmark-item"
+          :data-measure-id="item.id"
+          tabindex="-1"
+        >
+          <span class="bookmark-dot"></span>
+          <span>{{ itemLabel(item) }}</span>
+        </button>
+        <button
+          v-else
           class="bookmark-item folder-trigger"
-          :class="{ active: openFolderId === item.id }"
-          :title="itemLabel(item)"
-          @click.stop="toggleFolder(item)"
+          :data-measure-id="item.id"
+          tabindex="-1"
         >
           <span class="folder-icon"></span>
           <span>{{ itemLabel(item) }}</span>
@@ -152,16 +312,15 @@ function toggleFolder(item: BookmarkBarItem) {
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
-        <BookmarkFolderMenu
-          v-if="item.childrenLoaded"
-          class="folder-menu"
-          :class="{ 'is-open': openFolderId === item.id }"
-          :items="item.children ?? []"
-          @open="openBookmark"
-          @expand="loadFolderChildren"
-        />
-      </div>
-    </template>
+      </template>
+      <button class="bookmark-item more-trigger" data-role="measure-more" tabindex="-1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="5" cy="12" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="19" cy="12" r="1.5" />
+        </svg>
+      </button>
+    </div>
   </nav>
 </template>
 
@@ -184,8 +343,13 @@ function toggleFolder(item: BookmarkBarItem) {
   -webkit-backdrop-filter: blur(14px);
 }
 
-.browser-bookmark-bar::-webkit-scrollbar {
-  display: none;
+.browser-bookmark-content {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: visible;
 }
 
 .bookmark-item,
@@ -202,6 +366,7 @@ function toggleFolder(item: BookmarkBarItem) {
   color: var(--text-primary);
   font-size: 12px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .bookmark-item span:last-child,
@@ -241,9 +406,33 @@ function toggleFolder(item: BookmarkBarItem) {
   flex-shrink: 0;
 }
 
+.more-folder {
+  flex-shrink: 0;
+}
+
 .folder-trigger svg {
   flex-shrink: 0;
   opacity: 0.65;
+}
+
+.more-trigger {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
+}
+
+.bookmark-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .folder-menu,
@@ -266,6 +455,11 @@ function toggleFolder(item: BookmarkBarItem) {
 .folder-menu {
   top: calc(100% + 4px);
   left: 0;
+}
+
+.more-menu {
+  right: 0;
+  left: auto;
 }
 
 .folder-menu.is-open {

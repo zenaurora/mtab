@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { ref } from 'vue'
 import { loadStorageValue, removeStorageValue, useStorage } from '../composables/useStorage'
 import { loadLargeStorageValue, saveLargeStorageValue } from '../composables/useLargeStorage'
 import type {
@@ -31,26 +32,26 @@ const DEFAULT_ENGINES: SearchEngine[] = [
 ]
 
 const DEFAULT_BOOKMARKS: Bookmark[] = [
-  { id: 'bm_gmail',       name: 'Gmail',       url: 'https://mail.google.com',                         gridX: 4,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_bilibili',    name: 'Bilibili',    url: 'https://www.bilibili.com',                        gridX: 5,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_github',      name: 'GitHub',      url: 'https://github.com',                              gridX: 6,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_xiaohongshu', name: '小红书',       url: 'https://www.xiaohongshu.com',                     iconUrl: 'https://www.xiaohongshu.com/favicon.ico', gridX: 7,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_douyin',      name: '抖音',         url: 'https://www.douyin.com',                          gridX: 8,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_youtube',     name: 'YouTube',     url: 'https://www.youtube.com',                         gridX: 9,  gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_notion',      name: 'Notion',      url: 'https://www.notion.so',                           gridX: 10, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_vercel',      name: 'Vercel',      url: 'https://vercel.com',                              gridX: 11, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_gmail', name: 'Gmail', url: 'https://mail.google.com', gridX: 4, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_bilibili', name: 'Bilibili', url: 'https://www.bilibili.com', gridX: 5, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_github', name: 'GitHub', url: 'https://github.com', gridX: 6, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_xiaohongshu', name: '小红书', url: 'https://www.xiaohongshu.com', iconUrl: 'https://www.xiaohongshu.com/favicon.ico', gridX: 7, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_douyin', name: '抖音', url: 'https://www.douyin.com', gridX: 8, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_youtube', name: 'YouTube', url: 'https://www.youtube.com', gridX: 9, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_notion', name: 'Notion', url: 'https://www.notion.so', gridX: 10, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_vercel', name: 'Vercel', url: 'https://vercel.com', gridX: 11, gridY: 6, gridW: 1, gridH: 1 },
 
-  { id: 'bm_chatgpt',     name: 'ChatGPT',     url: 'https://chatgpt.com',                             gridX: 4,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_deepseek',    name: 'DeepSeek',    url: 'https://chat.deepseek.com',                       gridX: 5,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_qwen',        name: 'Qwen',        url: 'https://chat.qwen.ai',                            gridX: 6,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_kimi',        name: 'Kimi',        url: 'https://kimi.com',                                gridX: 7,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_zai',         name: 'Z.ai',        url: 'https://chat.z.ai',                               gridX: 8,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_ai_studio',   name: 'AI Studio',   url: 'https://aistudio.google.com/prompts/new_chat',     gridX: 9,  gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_ikuncode',    name: 'iKunCode',    url: 'https://api.ikuncode.cc',                         iconUrl: 'https://api.ikuncode.cc/favicon.ico', gridX: 10, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_claude',      name: 'Claude',      url: 'https://claude.ai',                               gridX: 11, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_gemini',      name: 'Gemini',      url: 'https://gemini.google.com',                       gridX: 12, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_perplexity',  name: 'Perplexity',  url: 'https://www.perplexity.ai',                       gridX: 13, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_doubao',      name: '豆包',         url: 'https://www.doubao.com',                          gridX: 14, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com', gridX: 4, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com', gridX: 5, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_qwen', name: 'Qwen', url: 'https://chat.qwen.ai', gridX: 6, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_kimi', name: 'Kimi', url: 'https://kimi.com', gridX: 7, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_zai', name: 'Z.ai', url: 'https://chat.z.ai', gridX: 8, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_ai_studio', name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat', gridX: 9, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_ikuncode', name: 'iKunCode', url: 'https://api.ikuncode.cc', iconUrl: 'https://api.ikuncode.cc/favicon.ico', gridX: 10, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_claude', name: 'Claude', url: 'https://claude.ai', gridX: 11, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_gemini', name: 'Gemini', url: 'https://gemini.google.com', gridX: 12, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai', gridX: 13, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_doubao', name: '豆包', url: 'https://www.doubao.com', gridX: 14, gridY: 7, gridW: 1, gridH: 1 },
 ]
 
 const CURRENT_DEFAULT_BOOKMARK_SEED_VERSION = 2
@@ -98,6 +99,30 @@ export const useSettingsStore = defineStore('settings', () => {
     cleanupLegacyLargeStorage
   )
 
+  // Blob URL for local wallpaper. It is recreated from IndexedDB on load and
+  // never persisted in the JSON settings payload.
+  const wallpaperBlobUrl = ref<string>('')
+
+  function createWallpaperBlobUrl(blob: Blob): string {
+    return URL.createObjectURL(blob)
+  }
+
+  function base64ToBlob(base64: string): Blob {
+    const [header, body] = base64.split(',')
+    const mime = header.match(/data:([^;]+)/)?.[1] ?? 'image/jpeg'
+    const binary = atob(body)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return new Blob([bytes], { type: mime })
+  }
+
+  function revokeWallpaperBlobUrl() {
+    if (wallpaperBlobUrl.value) {
+      URL.revokeObjectURL(wallpaperBlobUrl.value)
+      wallpaperBlobUrl.value = ''
+    }
+  }
+
   function sanitizeForStorage(settings: Settings): Settings {
     const wallpaperHistory = Array.isArray(settings.wallpaperHistory) ? settings.wallpaperHistory : []
     return {
@@ -115,25 +140,34 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // ── Wallpaper ──────────────────────────────────────────
   function setWallpaperUrl(url: string) {
+    revokeWallpaperBlobUrl()
     data.value.wallpaperUrl = url
     data.value.wallpaperBase64 = ''
     data.value.wallpaperColor = ''
   }
 
-  function setWallpaperBase64(base64: string) {
-    data.value.wallpaperBase64 = base64
+  function setWallpaperBlob(blob: Blob) {
+    revokeWallpaperBlobUrl()
+    wallpaperBlobUrl.value = createWallpaperBlobUrl(blob)
+    data.value.wallpaperBase64 = ''
     data.value.wallpaperUrl = ''
     data.value.wallpaperColor = ''
-    void saveLargeStorageValue(WALLPAPER_BASE64_KEY, base64)
+    void saveLargeStorageValue(WALLPAPER_BASE64_KEY, blob)
+  }
+
+  function setWallpaperBase64(base64: string) {
+    setWallpaperBlob(base64ToBlob(base64))
   }
 
   function setWallpaperColor(color: string) {
+    revokeWallpaperBlobUrl()
     data.value.wallpaperColor = color
     data.value.wallpaperUrl = ''
     data.value.wallpaperBase64 = ''
   }
 
   function clearWallpaper() {
+    revokeWallpaperBlobUrl()
     data.value.wallpaperUrl = ''
     data.value.wallpaperBase64 = ''
     data.value.wallpaperColor = ''
@@ -172,8 +206,8 @@ export const useSettingsStore = defineStore('settings', () => {
   function applyFromHistory(entry: WallpaperEntry) {
     if (entry.sourceType === 'base64') {
       if (entry.source === LOCAL_WALLPAPER_SOURCE) {
-        void loadStoredWallpaperBase64().then((base64) => {
-          if (base64) setWallpaperBase64(base64)
+        void loadStoredWallpaperBlob().then((blob) => {
+          if (blob) setWallpaperBlob(blob)
         })
       } else {
         setWallpaperBase64(entry.source)
@@ -223,9 +257,9 @@ export const useSettingsStore = defineStore('settings', () => {
   // ── Widgets ──────────────────────────────────────────────
   // Fixed sizes per widget type (in grid cells, each cell ~80px)
   const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
-    clock:     { gridW: 2, gridH: 2 },
-    date:      { gridW: 2, gridH: 1 },
-    notes:     { gridW: 3, gridH: 3 },
+    clock: { gridW: 2, gridH: 2 },
+    date: { gridW: 2, gridH: 1 },
+    notes: { gridW: 3, gridH: 3 },
     bookmarks: { gridW: 3, gridH: 2 },
   }
 
@@ -353,10 +387,15 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // ── Export / Import ──────────────────────────────────────
   function exportConfig(): MTabConfig {
+    const settings = JSON.parse(JSON.stringify(data.value)) as Settings
+    settings.wallpaperUrl = ''
+    settings.wallpaperBase64 = ''
+    settings.wallpaperColor = ''
+    settings.wallpaperHistory = []
     return {
       version: 1,
       exportedAt: new Date().toISOString(),
-      settings: JSON.parse(JSON.stringify(data.value)),
+      settings,
     }
   }
 
@@ -364,7 +403,14 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!config || config.version !== 1 || !config.settings) {
       throw new Error('Invalid mtab config file')
     }
-    Object.assign(data.value, config.settings)
+    const {
+      wallpaperUrl: _wallpaperUrl,
+      wallpaperBase64: _wallpaperBase64,
+      wallpaperColor: _wallpaperColor,
+      wallpaperHistory: _wallpaperHistory,
+      ...rest
+    } = config.settings
+    Object.assign(data.value, rest)
   }
 
   // ── Migration ──────────────────────────────────────────
@@ -467,10 +513,10 @@ export const useSettingsStore = defineStore('settings', () => {
   async function migrateLegacyWallpaperBase64() {
     const oldWallpaper = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
     if (oldWallpaper) {
-      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, oldWallpaper)
+      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, base64ToBlob(oldWallpaper))
     }
     await removeStorageValue(WALLPAPER_BASE64_KEY)
-    return oldWallpaper
+    return oldWallpaper ? base64ToBlob(oldWallpaper) : undefined
   }
 
   async function cleanupLegacyLargeStorage() {
@@ -478,11 +524,17 @@ export const useSettingsStore = defineStore('settings', () => {
     await removeStorageValue(LEGACY_SEARCH_HISTORY_KEY)
   }
 
-  async function loadStoredWallpaperBase64() {
-    const indexedDbValue = await loadLargeStorageValue<string>(WALLPAPER_BASE64_KEY)
-    if (indexedDbValue) {
+  async function loadStoredWallpaperBlob() {
+    const indexedDbValue = await loadLargeStorageValue<unknown>(WALLPAPER_BASE64_KEY)
+    if (indexedDbValue instanceof Blob) {
       await removeStorageValue(WALLPAPER_BASE64_KEY)
       return indexedDbValue
+    }
+    if (typeof indexedDbValue === 'string') {
+      const blob = base64ToBlob(indexedDbValue)
+      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, blob)
+      await removeStorageValue(WALLPAPER_BASE64_KEY)
+      return blob
     }
 
     return migrateLegacyWallpaperBase64()
@@ -501,21 +553,25 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     data,
     ready,
+    wallpaperBlobUrl,
     async load() {
       await cleanupLegacyLargeStorage()
       await load()
       if (data.value.wallpaperBase64) {
-        await saveLargeStorageValue(WALLPAPER_BASE64_KEY, data.value.wallpaperBase64)
+        // Migration: base64 ended up in Chrome storage, move to IndexedDB as a Blob.
+        await saveLargeStorageValue(WALLPAPER_BASE64_KEY, base64ToBlob(data.value.wallpaperBase64))
+        data.value.wallpaperBase64 = ''
       }
-      const localWallpaper = await loadStoredWallpaperBase64()
+      const localWallpaper = await loadStoredWallpaperBlob()
       if (localWallpaper && !data.value.wallpaperUrl && !data.value.wallpaperColor) {
-        data.value.wallpaperBase64 = localWallpaper
+        wallpaperBlobUrl.value = createWallpaperBlobUrl(localWallpaper)
       }
       migrateBookmarkPositions()
     },
     save,
     // wallpaper
     setWallpaperUrl,
+    setWallpaperBlob,
     setWallpaperBase64,
     setWallpaperColor,
     clearWallpaper,
