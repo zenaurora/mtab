@@ -37,7 +37,38 @@ const cellSize = computed(() =>
 
 对应代码是 [DesktopCanvas.vue](/Users/mkh/code1/mtab/src/components/DesktopCanvas.vue:142) 的 `gridStyle()`。
 
-这一步很关键。因为只要“数据层”一直是网格坐标，拖拽、碰撞、对齐、窗口缩放后的修正，都会简单很多。
+### 为什么用 translate3d 而不是 left/top 或 translate
+
+拖动过程中每一帧都会更新元素位置，性能非常敏感。这里选择 `translate3d` 而不是 `left/top` 定位或普通 `translate(x, y)`，核心原因是**强制 GPU 加速**。
+
+原理很简单：当 `transform` 的值包含 3D 函数时（哪怕 z 轴是 0），浏览器会把元素放到一个独立的合成层，交给 GPU 处理。这意味着：
+
+- 位置变化不会触发**重排**（reflow），不需要重新计算整个页面的布局。
+- 位置变化不会触发**重绘**（repaint），不需要重新绘制像素。
+- 浏览器只需要做一次**合成**（composite），把已经渲染好的图层移一下位置。
+
+对比一下：
+
+| 写法 | 重排 | 重绘 | 合成 | 拖拽表现 |
+|---|---|---|---|---|
+| `left / top` | 是 | 是 | - | 卡顿 |
+| `translate(x, y)` | 否 | 通常否 | 视浏览器 | 流畅但不保证 |
+| `translate3d(x, y, 0)` | 否 | 否 | 是 | 始终流畅 |
+
+实际渲染公式：
+
+```ts
+transform: `translate3d(${offset.x + pos.gridX * cell}px, ${offset.y + pos.gridY * cell}px, 0)`
+```
+
+其中：
+- `pos.gridX * cell`：网格坐标换算成像素基础值。
+- `offset.x / offset.y`：拖拽过程中的临时偏移量（松手后归零）。
+- z 轴固定为 `0`，纯粹为了触发 3D 合成层。
+
+所以 `translate3d(..., ..., 0)` 本质上就是"用 GPU 加速的方式移动元素到指定像素位置"，是前端做拖拽和动画的标配写法。
+
+这一步很关键。因为只要"数据层"一直是网格坐标，拖拽、碰撞、对齐、窗口缩放后的修正，都会简单很多。
 
 ## 为什么拖起来不会一碰就误触
 
@@ -217,11 +248,3 @@ function iconGridStyle(id: string, gridX: number, gridY: number) {
 
 第四，窗口尺寸变化后的 `clampCurrentLayoutToViewport()` 很容易被忽视。  
 如果以后改网格规则、边距规则、顶部栏高度，这里要一起检查，否则布局可能在缩放后悄悄出界。
-
-## 最后用一句话总结
-
-目前这套图标系统，本质上是“基于网格坐标的拖拽 + 基于占位快照的级联推挤 + 提交前的最终归一化”。
-
-用户感受到的是：图标会吸附、会让位、不会乱。
-
-代码真正做的是：先算清楚，再一次性落下去。

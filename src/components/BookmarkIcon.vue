@@ -1,25 +1,30 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { Bookmark } from '../types'
 
-defineProps<{
+const props = defineProps<{
   bookmark: Bookmark
   imgStyle: CSSProperties
   failed: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   load: []
   error: []
 }>()
 
-function faviconUrl(bookmark: Bookmark): string {
-  if (bookmark.iconUrl) return bookmark.iconUrl
+function faviconCandidates(bookmark: Bookmark): string[] {
+  const candidates: string[] = []
+  if (bookmark.iconUrl) candidates.push(bookmark.iconUrl)
   try {
-    return `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=128`
+    const url = new URL(bookmark.url)
+    candidates.push(`${url.origin}/favicon.ico`)
+    candidates.push(`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`)
   } catch {
-    return ''
+    return candidates
   }
+  return Array.from(new Set(candidates.filter(Boolean)))
 }
 
 function extractDomain(url: string): string {
@@ -29,20 +34,44 @@ function extractDomain(url: string): string {
 function displayName(bm: Bookmark): string {
   return bm.name || extractDomain(bm.url)
 }
+
+const candidateIndex = ref(0)
+
+const iconSrc = computed(() => {
+  const candidates = faviconCandidates(props.bookmark)
+  return candidates[candidateIndex.value] ?? ''
+})
+
+watch(
+  () => [props.bookmark.url, props.bookmark.iconUrl],
+  () => {
+    candidateIndex.value = 0
+  },
+  { immediate: true }
+)
+
+function onImgError() {
+  const candidates = faviconCandidates(props.bookmark)
+  if (candidateIndex.value < candidates.length - 1) {
+    candidateIndex.value += 1
+    return
+  }
+  emit('error')
+}
 </script>
 
 <template>
   <div class="icon-img-wrap" :style="imgStyle">
-    <span v-if="failed" class="icon-fallback">
+    <span v-if="failed || !iconSrc" class="icon-fallback">
       {{ displayName(bookmark).charAt(0).toUpperCase() }}
     </span>
     <img
       v-else
-      :src="faviconUrl(bookmark)"
+      :src="iconSrc"
       :alt="bookmark.name"
       class="icon-img"
-      @load="$emit('load')"
-      @error="$emit('error')"
+      @load="emit('load')"
+      @error="onImgError"
     />
   </div>
   <span class="icon-label">{{ displayName(bookmark) }}</span>

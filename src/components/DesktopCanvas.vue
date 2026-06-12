@@ -310,8 +310,8 @@ function onWidgetPointerDown(e: PointerEvent, widgetId: string, gx: number, gy: 
   startX.value = e.clientX
   startY.value = e.clientY
   dragSnapshot = buildOccupancySnapshot(widgetId)
-  lastDropPlan = null
-  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  lastDropPlan = null;
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
 
@@ -338,7 +338,7 @@ function onIconPointerDown(e: PointerEvent, bm: Bookmark) {
   startY.value = e.clientY
   dragSnapshot = buildOccupancySnapshot(bm.id)
   lastDropPlan = null
-  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    ; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
 
@@ -346,6 +346,8 @@ function onAddBtnPointerDown(e: PointerEvent) {
   if (e.button !== 0) return
   const target = e.target as HTMLElement
   if (target.closest('.icon-del')) return
+
+
 
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   draggingId.value = ADD_BTN_ID
@@ -364,7 +366,7 @@ function onAddBtnPointerDown(e: PointerEvent) {
   startY.value = e.clientY
   dragSnapshot = buildOccupancySnapshot(ADD_BTN_ID)
   lastDropPlan = null
-  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    ; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   e.preventDefault()
 }
 
@@ -780,107 +782,73 @@ onUnmounted(() => {
 <template>
   <div class="desktop-canvas">
     <!-- ── Widgets (free-form grid) ─────────────────────────── -->
-    <div
-      v-for="w in store.data.widgets"
-      :key="w.id"
-      class="canvas-item widget-item glass-panel"
-      :class="itemClass(w.id)"
-      :style="gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
-      @pointerdown="onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)"
-    >
+    <div v-for="w in store.data.widgets" :key="w.id" class="canvas-item widget-item glass-panel"
+      :class="itemClass(w.id)" :style="gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
+      @pointerdown="onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)">
       <button class="item-del" @click.stop="store.removeWidget(w.id)" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-          <path d="M18 6L6 18M6 6l12 12"/>
+          <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
       <component :is="componentMap[w.type]" />
     </div>
 
     <!-- ── Bookmark icons (free-form grid, cascade on collision) ── -->
-    <div
-      v-for="bm in store.data.bookmarks"
-      :key="bm.id"
-      v-show="bm.gridX !== undefined && bm.gridY !== undefined"
-      class="canvas-item icon-item"
-      :class="itemClass(bm.id)"
-      :style="iconGridStyle(bm.id, bm.gridX ?? 0, bm.gridY ?? 0)"
-      @pointerdown="onIconPointerDown($event, bm)"
-    >
+    <div v-for="bm in store.data.bookmarks" :key="bm.id" v-show="bm.gridX !== undefined && bm.gridY !== undefined"
+      class="canvas-item icon-item" :class="itemClass(bm.id)"
+      :style="iconGridStyle(bm.id, bm.gridX ?? 0, bm.gridY ?? 0)" @pointerdown="onIconPointerDown($event, bm)">
       <span class="icon-del" @click.stop="store.removeBookmark(bm.id)" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-          <path d="M18 6L6 18M6 6l12 12"/>
+          <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </span>
       <span class="icon-edit" @click.stop="openEditModal(bm)" title="Edit">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
         </svg>
       </span>
-      <BookmarkIcon
-        :bookmark="bm"
-        :img-style="iconImgStyle"
-        :failed="failedIcons.has(bm.id)"
-        @load="failedIcons.delete(bm.id)"
-        @error="failedIcons.add(bm.id)"
-      />
+      <BookmarkIcon :bookmark="bm" :img-style="iconImgStyle" :failed="failedIcons.has(bm.id)"
+        @load="failedIcons.delete(bm.id)" @error="failedIcons.add(bm.id)" />
     </div>
 
     <!-- ── Add button ───────────────────────────────────────── -->
-    <div
-      v-if="store.data.showAddButton"
-      class="canvas-item icon-item icon-add"
-      :class="itemClass(ADD_BTN_ID)"
+    <div v-if="store.data.showAddButton" class="canvas-item icon-item icon-add" :class="itemClass(ADD_BTN_ID)"
       :style="iconGridStyle(ADD_BTN_ID, store.data.addButtonGridX, store.data.addButtonGridY)"
-      @pointerdown="onAddBtnPointerDown"
-      @click="openAddModal"
-      title="Add shortcut"
-    >
+      @pointerdown="onAddBtnPointerDown" @click="openAddModal" title="Add shortcut">
       <span class="icon-del" @click.stop="store.hideAddButton()" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-          <path d="M18 6L6 18M6 6l12 12"/>
+          <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </span>
       <div class="icon-img-wrap icon-add-img" :style="iconImgStyle">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 5v14M5 12h14"/>
+          <path d="M12 5v14M5 12h14" />
         </svg>
       </div>
       <span class="icon-label">Add</span>
     </div>
 
     <!-- ── Drop zone indicator ──────────────────────────────── -->
-    <div
-      v-if="isDragging"
-      ref="dropIndicatorEl"
-      class="drop-indicator"
-    />
+    <div v-if="isDragging" ref="dropIndicatorEl" class="drop-indicator" />
   </div>
 
   <!-- ── Drag ghost (teleported to body) ────────────────────── -->
   <Teleport to="body">
-    <div
-      v-if="isDragging"
-      ref="ghostEl"
-      class="canvas-ghost"
-      :style="{ width: `${dragW}px`, height: `${dragH}px` }"
-    >
+    <div v-if="isDragging" ref="ghostEl" class="canvas-ghost" :style="{ width: `${dragW}px`, height: `${dragH}px` }">
       <div v-if="draggingWidget" class="ghost-widget">
         <div class="ghost-widget-inner glass-panel" :style="{ width: '100%', height: '100%', opacity: 0.75 }">
           <component :is="componentMap[draggingWidget.type]" />
         </div>
       </div>
       <div v-else-if="draggingBookmark" class="ghost-icon">
-        <BookmarkIcon
-          :bookmark="draggingBookmark"
-          :img-style="iconImgStyle"
-          :failed="failedIcons.has(draggingBookmark.id)"
-        />
+        <BookmarkIcon :bookmark="draggingBookmark" :img-style="iconImgStyle"
+          :failed="failedIcons.has(draggingBookmark.id)" />
       </div>
       <div v-else-if="draggingId === ADD_BTN_ID" class="ghost-icon">
         <div class="icon-img-wrap icon-add-img" :style="iconImgStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 5v14M5 12h14"/>
+            <path d="M12 5v14M5 12h14" />
           </svg>
         </div>
         <span class="icon-label">Add</span>
@@ -931,7 +899,9 @@ onUnmounted(() => {
   transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s;
 }
 
-.canvas-item:active { cursor: grabbing; }
+.canvas-item:active {
+  cursor: grabbing;
+}
 
 .canvas-item.instant-move {
   transition: opacity 0.15s;
@@ -944,7 +914,9 @@ onUnmounted(() => {
 }
 
 /* ── Widget items ──────────────────────────────────────────── */
-.widget-item { overflow: hidden; }
+.widget-item {
+  overflow: hidden;
+}
 
 .item-del {
   position: absolute;
@@ -966,8 +938,13 @@ onUnmounted(() => {
   border: none;
 }
 
-.widget-item:hover .item-del { opacity: 1; }
-.item-del:hover { background: #ef4444; }
+.widget-item:hover .item-del {
+  opacity: 1;
+}
+
+.item-del:hover {
+  background: #ef4444;
+}
 
 /* ── Icon items ────────────────────────────────────────────── */
 .icon-item {
@@ -981,7 +958,9 @@ onUnmounted(() => {
   position: absolute;
 }
 
-.icon-item:hover { background: var(--bg-glass); }
+.icon-item:hover {
+  background: var(--bg-glass);
+}
 
 .icon-del,
 .icon-edit {
@@ -999,13 +978,30 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.icon-del { top: 4px; right: 4px; background: rgba(239, 68, 68, 0.85); }
-.icon-edit { top: 4px; left: 4px; background: rgba(60, 60, 80, 0.85); }
+.icon-del {
+  top: 4px;
+  right: 4px;
+  background: rgba(239, 68, 68, 0.85);
+}
+
+.icon-edit {
+  top: 4px;
+  left: 4px;
+  background: rgba(60, 60, 80, 0.85);
+}
 
 .icon-item:hover .icon-del,
-.icon-item:hover .icon-edit { opacity: 1; }
-.icon-del:hover { background: #ef4444; }
-.icon-edit:hover { background: var(--accent); }
+.icon-item:hover .icon-edit {
+  opacity: 1;
+}
+
+.icon-del:hover {
+  background: #ef4444;
+}
+
+.icon-edit:hover {
+  background: var(--accent);
+}
 
 .icon-add-img {
   border: 2px dashed var(--border);
@@ -1045,7 +1041,10 @@ onUnmounted(() => {
   will-change: transform;
 }
 
-.ghost-widget { width: 100%; height: 100%; }
+.ghost-widget {
+  width: 100%;
+  height: 100%;
+}
 
 .ghost-icon {
   display: flex;
@@ -1077,17 +1076,41 @@ onUnmounted(() => {
   gap: 16px;
 }
 
-.modal h3 { font-size: 16px; font-weight: 600; margin: 0; }
+.modal h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
 
-.modal-field { display: flex; flex-direction: column; gap: 6px; }
-.modal-field label { font-size: 12px; color: var(--text-secondary); }
-.modal-field input { width: 100%; }
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-field label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.modal-field input {
+  width: 100%;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 
 .modal-fade-enter-active,
-.modal-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
 
 .modal-fade-enter-from,
-.modal-fade-leave-to { opacity: 0; transform: scale(0.95); }
+.modal-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
 </style>

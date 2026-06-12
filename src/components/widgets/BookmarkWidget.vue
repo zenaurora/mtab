@@ -1,18 +1,39 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 
 const store = useSettingsStore()
 const bookmarks = computed(() => store.data.bookmarks)
+const failedIconKeys = reactive(new Set<string>())
 
-function faviconUrl(bookmark: { url: string; iconUrl?: string }): string {
-  if (bookmark.iconUrl) return bookmark.iconUrl
+function faviconCandidates(bookmark: { url: string; iconUrl?: string }): string[] {
+  const candidates: string[] = []
+  if (bookmark.iconUrl) candidates.push(bookmark.iconUrl)
   try {
-    const domain = new URL(bookmark.url).hostname
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+    const url = new URL(bookmark.url)
+    candidates.push(`${url.origin}/favicon.ico`)
+    candidates.push(`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`)
   } catch {
-    return ''
+    return candidates
   }
+  return Array.from(new Set(candidates.filter(Boolean)))
+}
+
+function faviconUrl(bookmark: { id: string; url: string; iconUrl?: string }): string {
+  if (failedIconKeys.has(bookmark.id)) return ''
+  return faviconCandidates(bookmark)[0] ?? ''
+}
+
+function onIconError(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
+  const img = event.target as HTMLImageElement
+  const candidates = faviconCandidates(bookmark)
+  const currentIndex = candidates.indexOf(img.currentSrc || img.src)
+  const nextSrc = candidates[currentIndex + 1]
+  if (nextSrc) {
+    img.src = nextSrc
+    return
+  }
+  failedIconKeys.add(bookmark.id)
 }
 
 function siteName(bm: { name: string; url: string }): string {
@@ -57,7 +78,7 @@ function navigate(url: string) {
           :src="faviconUrl(bm)"
           :alt="bm.name"
           class="favicon"
-          @error="($event.target as HTMLImageElement).style.display = 'none'"
+          @error="onIconError(bm, $event)"
         />
         <span v-else class="favicon-fallback">{{
           siteName(bm).charAt(0).toUpperCase()
