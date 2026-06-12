@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { Bookmark } from '../types'
+import { displayBookmarkName, faviconCandidates } from '../utils/bookmarkIcon'
+import { shouldRejectLoadedFavicon } from '../utils/faviconValidation'
 
 const props = defineProps<{
   bookmark: Bookmark
@@ -14,25 +16,8 @@ const emit = defineEmits<{
   error: []
 }>()
 
-function faviconCandidates(bookmark: Bookmark): string[] {
-  const candidates: string[] = []
-  if (bookmark.iconUrl) candidates.push(bookmark.iconUrl)
-  try {
-    const url = new URL(bookmark.url)
-    candidates.push(`${url.origin}/favicon.ico`)
-    candidates.push(`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`)
-  } catch {
-    return candidates
-  }
-  return Array.from(new Set(candidates.filter(Boolean)))
-}
-
-function extractDomain(url: string): string {
-  try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
-}
-
 function displayName(bm: Bookmark): string {
-  return bm.name || extractDomain(bm.url)
+  return displayBookmarkName(bm)
 }
 
 const candidateIndex = ref(0)
@@ -50,13 +35,26 @@ watch(
   { immediate: true }
 )
 
-function onImgError() {
+function advanceOrFail() {
   const candidates = faviconCandidates(props.bookmark)
   if (candidateIndex.value < candidates.length - 1) {
     candidateIndex.value += 1
     return
   }
   emit('error')
+}
+
+function onImgError() {
+  advanceOrFail()
+}
+
+function onImgLoad(event: Event) {
+  const img = event.target as HTMLImageElement
+  if (shouldRejectLoadedFavicon(img)) {
+    advanceOrFail()
+    return
+  }
+  emit('load')
 }
 </script>
 
@@ -70,7 +68,7 @@ function onImgError() {
       :src="iconSrc"
       :alt="bookmark.name"
       class="icon-img"
-      @load="emit('load')"
+      @load="onImgLoad"
       @error="onImgError"
     />
   </div>

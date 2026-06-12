@@ -1,30 +1,19 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
+import { displayBookmarkName, faviconCandidates } from '../../utils/bookmarkIcon'
+import { shouldRejectLoadedFavicon } from '../../utils/faviconValidation'
 
 const store = useSettingsStore()
 const bookmarks = computed(() => store.data.bookmarks)
 const failedIconKeys = reactive(new Set<string>())
-
-function faviconCandidates(bookmark: { url: string; iconUrl?: string }): string[] {
-  const candidates: string[] = []
-  if (bookmark.iconUrl) candidates.push(bookmark.iconUrl)
-  try {
-    const url = new URL(bookmark.url)
-    candidates.push(`${url.origin}/favicon.ico`)
-    candidates.push(`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`)
-  } catch {
-    return candidates
-  }
-  return Array.from(new Set(candidates.filter(Boolean)))
-}
 
 function faviconUrl(bookmark: { id: string; url: string; iconUrl?: string }): string {
   if (failedIconKeys.has(bookmark.id)) return ''
   return faviconCandidates(bookmark)[0] ?? ''
 }
 
-function onIconError(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
+function advanceIcon(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
   const img = event.target as HTMLImageElement
   const candidates = faviconCandidates(bookmark)
   const currentIndex = candidates.indexOf(img.currentSrc || img.src)
@@ -37,12 +26,21 @@ function onIconError(bookmark: { id: string; url: string; iconUrl?: string }, ev
 }
 
 function siteName(bm: { name: string; url: string }): string {
-  if (bm.name) return bm.name
-  try {
-    return new URL(bm.url).hostname.replace('www.', '')
-  } catch {
-    return bm.url
+  return displayBookmarkName(bm)
+}
+
+function onIconError(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
+  advanceIcon(bookmark, event)
+}
+
+function onIconLoad(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
+  const img = event.target as HTMLImageElement
+  if (shouldRejectLoadedFavicon(img)) {
+    advanceIcon(bookmark, event)
+    return
   }
+
+  failedIconKeys.delete(bookmark.id)
 }
 
 function navigate(url: string) {
@@ -78,6 +76,7 @@ function navigate(url: string) {
           :src="faviconUrl(bm)"
           :alt="bm.name"
           class="favicon"
+          @load="onIconLoad(bm, $event)"
           @error="onIconError(bm, $event)"
         />
         <span v-else class="favicon-fallback">{{
