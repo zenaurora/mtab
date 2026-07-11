@@ -16,7 +16,7 @@ export interface SearchEngine {
 }
 
 // Widget types
-export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks'
+export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks' | 'search'
 
 export interface Widget {
   id: string

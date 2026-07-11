@@ -5,6 +5,7 @@ import type { Bookmark } from '../types'
 import ClockWidget from './widgets/ClockWidget.vue'
 import DateWidget from './widgets/DateWidget.vue'
 import NotesWidget from './widgets/NotesWidget.vue'
+import SearchWidget from './widgets/SearchWidget.vue'
 import BookmarkWidget from './widgets/BookmarkWidget.vue'
 import BookmarkIcon from './BookmarkIcon.vue'
 
@@ -33,7 +34,6 @@ const dropIndicatorEl = ref<HTMLElement | null>(null)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 const viewportHeight = ref(typeof window === 'undefined' ? 900 : window.innerHeight)
 let rafId = 0
-let layoutClampTimer: ReturnType<typeof setTimeout> | null = null
 let justDragged = false
 let lastSnapGridX = -1
 let lastSnapGridY = -1
@@ -83,11 +83,18 @@ const cellSize = computed(() =>
   Math.max(96, store.data.iconSize + 28)
 )
 
+const searchWidget = computed(() => store.data.widgets.find((w) => w.type === 'search') ?? null)
+const searchBarClearance = computed(() => {
+  const widget = searchWidget.value
+  if (widget) return widget.gridY * cellSize.value + widget.gridH * cellSize.value + 24
+  return 24
+})
+
 const canvasOffset = computed(() => {
   const cell = cellSize.value
   const paddingX = viewportWidth.value < 720 ? 12 : 24
   const topReserved = store.data.showBrowserBookmarkBar ? 42 : 12
-  const paddingY = Math.max(topReserved, viewportHeight.value < 640 ? 10 : 24)
+  const paddingY = Math.max(topReserved, searchBarClearance.value, viewportHeight.value < 640 ? 10 : 24)
   const defaultStartX = 4
   const defaultStartY = 6
   const defaultCols = viewportWidth.value < 900 ? 4 : 8
@@ -182,23 +189,29 @@ function cellKey(col: number, row: number): CellKey {
   return `${col},${row}`
 }
 
-function buildOccupancySnapshot(excludeId?: string): OccupancySnapshot {
+function buildOccupancySnapshot(excludeId?: string, usePreviewPositions = false): OccupancySnapshot {
   const bookmarks = new Map<CellKey, Bookmark>()
   const widgetCells = new Set<CellKey>()
 
   for (const b of store.data.bookmarks) {
     if (b.id === excludeId) continue
-    if (b.gridX === undefined || b.gridY === undefined) continue
-    bookmarks.set(cellKey(b.gridX, b.gridY), b)
+    const preview = usePreviewPositions ? previewPositions[b.id] : undefined
+    const gridX = preview?.gridX ?? b.gridX
+    const gridY = preview?.gridY ?? b.gridY
+    if (gridX === undefined || gridY === undefined) continue
+    bookmarks.set(cellKey(gridX, gridY), { ...b, gridX, gridY })
   }
 
   if (store.data.showAddButton && excludeId !== ADD_BTN_ID) {
-    bookmarks.set(cellKey(store.data.addButtonGridX, store.data.addButtonGridY), {
+    const addPreview = usePreviewPositions ? previewPositions[ADD_BTN_ID] : undefined
+    const addGridX = addPreview?.gridX ?? store.data.addButtonGridX
+    const addGridY = addPreview?.gridY ?? store.data.addButtonGridY
+    bookmarks.set(cellKey(addGridX, addGridY), {
       id: ADD_BTN_ID,
       name: 'Add',
       url: '',
-      gridX: store.data.addButtonGridX,
-      gridY: store.data.addButtonGridY,
+      gridX: addGridX,
+      gridY: addGridY,
       gridW: 1,
       gridH: 1,
     })
@@ -225,7 +238,28 @@ function cloneOccupancySnapshot(snapshot: OccupancySnapshot): OccupancySnapshot 
 
 function isOccupiedInSnapshot(snapshot: OccupancySnapshot, col: number, row: number): boolean {
   const key = cellKey(col, row)
-  return snapshot.bookmarks.has(key) || snapshot.widgetCells.has(key)
+  return snapshot.bookmarks.has(key) || snapshot.widgetCells.has(key) || isSearchWidgetArea(col, row)
+}
+
+function isSearchWidgetArea(col: number, row: number) {
+  if (!searchWidget.value) return false
+
+  const cell = cellSize.value
+  const offset = canvasOffset.value
+  const iconLeft = offset.x + col * cell
+  const iconTop = offset.y + row * cell
+  const iconRight = iconLeft + cell
+  const iconBottom = iconTop + cell
+  const searchWidth = Math.min(viewportWidth.value - 48, viewportWidth.value * store.data.searchBarWidth / 100)
+  const positionRatio = store.data.searchBarPosition === 'top' ? 0.1
+    : store.data.searchBarPosition === 'bottom' ? 0.75
+      : 0.38
+  const searchTop = viewportHeight.value * positionRatio + store.data.searchBarOffsetY
+  const searchBottom = searchTop + 76
+  const searchLeft = (viewportWidth.value - searchWidth) / 2
+  const searchRight = searchLeft + searchWidth
+
+  return iconLeft < searchRight && iconRight > searchLeft && iconTop < searchBottom && iconBottom > searchTop
 }
 
 function isAreaOccupiedInSnapshot(
@@ -237,7 +271,7 @@ function isAreaOccupiedInSnapshot(
 ): boolean {
   for (let dx = 0; dx < gridW; dx++) {
     for (let dy = 0; dy < gridH; dy++) {
-      if (isOccupiedInSnapshot(snapshot, col + dx, row + dy)) return true
+      if (isOccupiedInSnapshot(snapshot, col + dx, row + dy) || isSearchWidgetArea(col + dx, row + dy)) return true
     }
   }
   return false
@@ -276,15 +310,6 @@ function pointerToGrid(x: number, y: number) {
 function updateViewportSize() {
   viewportWidth.value = window.innerWidth
   viewportHeight.value = window.innerHeight
-  scheduleLayoutClamp()
-}
-
-function scheduleLayoutClamp() {
-  if (layoutClampTimer) clearTimeout(layoutClampTimer)
-  layoutClampTimer = setTimeout(() => {
-    layoutClampTimer = null
-    clampCurrentLayoutToViewport()
-  }, 120)
 }
 
 // ── Widget pointer down ──────────────────────────────────────
@@ -527,7 +552,7 @@ function planIconDrop(id: string, rawX: number, rawY: number, baseSnapshot = dra
   const drop = clampGridPosition(rawX, rawY)
   const col = drop.gridX
   const row = drop.gridY
-  const snapshot = cloneOccupancySnapshot(baseSnapshot ?? buildOccupancySnapshot(id))
+  const snapshot = cloneOccupancySnapshot(baseSnapshot ?? buildOccupancySnapshot(id, true))
   const occupant = snapshot.bookmarks.get(cellKey(col, row))
   const widgetBlocker = snapshot.widgetCells.has(cellKey(col, row))
   const occupied = Boolean(occupant || widgetBlocker)
@@ -594,44 +619,6 @@ function resolvePatchCollisions(patches: BookmarkPositionPatch[]) {
   return result
 }
 
-function clampCurrentLayoutToViewport() {
-  if (isDragging.value || pendingDrag.value) return
-
-  let changed = false
-
-  for (const widget of store.data.widgets) {
-    const clamped = clampGridPosition(widget.gridX, widget.gridY, widget.gridW, widget.gridH)
-    if (clamped.gridX === widget.gridX && clamped.gridY === widget.gridY) continue
-
-    const pos = findFreePosition(clamped.gridX, clamped.gridY, widget.gridW, widget.gridH, widget.id)
-    store.moveWidget(widget.id, pos.gridX, pos.gridY)
-    changed = true
-  }
-
-  const iconPatches: BookmarkPositionPatch[] = []
-  for (const bm of store.data.bookmarks) {
-    if (bm.gridX === undefined || bm.gridY === undefined) continue
-    const clamped = clampGridPosition(bm.gridX, bm.gridY)
-    if (clamped.gridX !== bm.gridX || clamped.gridY !== bm.gridY) {
-      iconPatches.push({ id: bm.id, gridX: clamped.gridX, gridY: clamped.gridY })
-    }
-  }
-
-  if (store.data.showAddButton) {
-    const clamped = clampGridPosition(store.data.addButtonGridX, store.data.addButtonGridY)
-    if (clamped.gridX !== store.data.addButtonGridX || clamped.gridY !== store.data.addButtonGridY) {
-      iconPatches.push({ id: ADD_BTN_ID, gridX: clamped.gridX, gridY: clamped.gridY })
-    }
-  }
-
-  if (iconPatches.length > 0) {
-    commitIconPatches(iconPatches)
-    changed = true
-  }
-
-  if (changed) void store.save()
-}
-
 function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
   if (dragKind.value !== 'icon' || !draggingId.value) {
     for (const key in previewPositions) delete previewPositions[key]
@@ -646,6 +633,12 @@ function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
   }
   for (const patch of plan.patches) {
     previewPositions[patch.id] = { gridX: patch.gridX, gridY: patch.gridY }
+  }
+  if (store.data.showAddButton) {
+    previewPositions[ADD_BTN_ID] = {
+      gridX: store.data.addButtonGridX,
+      gridY: store.data.addButtonGridY,
+    }
   }
   lastDropPlan = plan
   return plan
@@ -759,8 +752,25 @@ function submitModal() {
 }
 
 const componentMap: Record<string, typeof ClockWidget> = {
-  clock: ClockWidget, date: DateWidget, notes: NotesWidget, bookmarks: BookmarkWidget,
+  clock: ClockWidget,
+  date: DateWidget,
+  notes: NotesWidget,
+  search: SearchWidget,
+  bookmarks: BookmarkWidget,
 }
+
+const searchWidgetStyle = computed(() => {
+  const pos = store.data.searchBarPosition
+  const offset = store.data.searchBarOffsetY
+  const top = pos === 'top' ? `calc(10% + ${offset}px)` : pos === 'bottom' ? `calc(75% + ${offset}px)` : `calc(38% + ${offset}px)`
+  return {
+    position: 'absolute' as const,
+    left: '50%',
+    top,
+    width: `${store.data.searchBarWidth}%`,
+    transform: 'translateX(-50%)',
+  }
+})
 
 onMounted(() => {
   updateViewportSize()
@@ -771,7 +781,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (layoutClampTimer) clearTimeout(layoutClampTimer)
   window.removeEventListener('resize', updateViewportSize)
   window.removeEventListener('pointermove', onWindowPointerMove)
   window.removeEventListener('pointerup', onWindowPointerUp)
@@ -782,10 +791,11 @@ onUnmounted(() => {
 <template>
   <div class="desktop-canvas">
     <!-- ── Widgets (free-form grid) ─────────────────────────── -->
-    <div v-for="w in store.data.widgets" :key="w.id" class="canvas-item widget-item glass-panel"
-      :class="itemClass(w.id)" :style="gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
-      @pointerdown="onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)">
-      <button class="item-del" @click.stop="store.removeWidget(w.id)" title="Remove">
+    <div v-for="w in store.data.widgets" :key="w.id" class="canvas-item widget-item"
+      :class="[itemClass(w.id), { 'search-widget-shell': w.type === 'search' }]"
+      :style="w.type === 'search' ? searchWidgetStyle : gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
+      @pointerdown="w.type === 'search' ? undefined : onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)">
+      <button v-if="w.type !== 'search'" class="item-del" @click.stop="store.removeWidget(w.id)" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
@@ -916,6 +926,12 @@ onUnmounted(() => {
 /* ── Widget items ──────────────────────────────────────────── */
 .widget-item {
   overflow: hidden;
+}
+
+.search-widget-shell {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .item-del {

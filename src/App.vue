@@ -2,7 +2,6 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from './stores/settings'
 import WallpaperBg from './components/WallpaperBg.vue'
-import SearchBar from './components/SearchBar.vue'
 import DesktopCanvas from './components/DesktopCanvas.vue'
 import BrowserBookmarkBar from './components/BrowserBookmarkBar.vue'
 import SearchHistorySidebar from './components/SearchHistorySidebar.vue'
@@ -56,9 +55,6 @@ watch(
   >
     <!-- Background -->
     <WallpaperBg />
-
-    <!-- Search bar -->
-    <SearchBar />
 
     <!-- Browser bookmark bar mirror -->
     <BrowserBookmarkBar />
@@ -115,6 +111,7 @@ watch(
   width: 100%;
   height: 100%;
   position: relative;
+  --search-bar-bottom: 0px;
 }
 
 .settings-toggle {

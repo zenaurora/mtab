@@ -71,7 +71,22 @@ const DEFAULT_SETTINGS: Settings = {
   searchEngines: DEFAULT_ENGINES,
   darkMode: true,
   performanceMode: false,
-  widgets: [],
+  widgets: [
+    {
+      id: 'widget_search',
+      type: 'search',
+      gridX: 4,
+      gridY: 2,
+      gridW: 6,
+      gridH: 2,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      order: 0,
+      config: {},
+    },
+  ],
   bookmarks: DEFAULT_BOOKMARKS,
   defaultBookmarkSeedVersion: 0,
   showBrowserBookmarkBar: true,
@@ -260,6 +275,7 @@ export const useSettingsStore = defineStore('settings', () => {
     clock: { gridW: 2, gridH: 2 },
     date: { gridW: 2, gridH: 1 },
     notes: { gridW: 3, gridH: 3 },
+    search: { gridW: 6, gridH: 1 },
     bookmarks: { gridW: 3, gridH: 2 },
   }
 
@@ -464,6 +480,28 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!Array.isArray(data.value.widgets)) {
       data.value.widgets = []
     }
+    const searchWidget = data.value.widgets.find((w) => w.type === 'search')
+    if (searchWidget) {
+      searchWidget.gridX = 4
+      searchWidget.gridY = 2
+      searchWidget.gridW = 6
+      searchWidget.gridH = 1
+    } else {
+      data.value.widgets.unshift({
+        id: 'widget_search',
+        type: 'search',
+        gridX: 4,
+        gridY: 2,
+        gridW: 6,
+        gridH: 1,
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        order: 0,
+        config: {},
+      })
+    }
     if (!Array.isArray(data.value.bookmarks)) {
       data.value.bookmarks = [...DEFAULT_BOOKMARKS.map((bm) => ({ ...bm }))]
     }
@@ -567,6 +605,7 @@ export const useSettingsStore = defineStore('settings', () => {
         wallpaperBlobUrl.value = createWallpaperBlobUrl(localWallpaper)
       }
       migrateBookmarkPositions()
+      await save()
     },
     save,
     // wallpaper

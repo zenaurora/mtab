@@ -8,6 +8,12 @@ const showEngineMenu = ref(false)
 const searchRoot = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 
+function getSearchBarRect() {
+  return searchRoot.value?.getBoundingClientRect() ?? null
+}
+
+defineExpose({ getSearchBarRect })
+
 const activeEngine = computed(() =>
   store.data.searchEngines.find((e) => e.id === store.data.activeEngineId) ??
   store.data.searchEngines[0]
