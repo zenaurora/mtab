@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, reactive, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, reactive, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import type { Bookmark } from '../types'
 import ClockWidget from './widgets/ClockWidget.vue'
@@ -84,17 +84,12 @@ const cellSize = computed(() =>
 )
 
 const searchWidget = computed(() => store.data.widgets.find((w) => w.type === 'search') ?? null)
-const searchBarClearance = computed(() => {
-  const widget = searchWidget.value
-  if (widget) return widget.gridY * cellSize.value + widget.gridH * cellSize.value + 24
-  return 24
-})
 
 const canvasOffset = computed(() => {
   const cell = cellSize.value
   const paddingX = viewportWidth.value < 720 ? 12 : 24
   const topReserved = store.data.showBrowserBookmarkBar ? 42 : 12
-  const paddingY = Math.max(topReserved, searchBarClearance.value, viewportHeight.value < 640 ? 10 : 24)
+  const paddingY = Math.max(topReserved, viewportHeight.value < 640 ? 10 : 24)
   const defaultStartX = 4
   const defaultStartY = 6
   const defaultCols = viewportWidth.value < 900 ? 4 : 8
@@ -106,6 +101,27 @@ const canvasOffset = computed(() => {
     x: Math.max(paddingX, Math.floor((viewportWidth.value - layoutW) / 2)) - defaultStartX * cell,
     y: Math.max(paddingY, Math.floor((viewportHeight.value - layoutH) / 2)) - defaultStartY * cell,
   }
+})
+
+// The search widget lives on the same grid as icons and other widgets. Its
+// footprint is derived from the user's width/position/offset settings, then
+// snapped to whole cells so icons collide with it through the normal
+// occupancy path — one coordinate system, no overlap possible.
+const searchGridRect = computed<{ gridX: number; gridY: number; gridW: number; gridH: number } | null>(() => {
+  if (!searchWidget.value) return null
+  const base = gridBounds(1, 1)
+  const totalCols = base.maxX - base.minX + 1
+  const totalRows = base.maxY - base.minY + 1
+  const gridW = clampNumber(Math.round((totalCols * store.data.searchBarWidth) / 100), 1, Math.max(1, totalCols))
+  const gridH = 1
+  const bounds = gridBounds(gridW, gridH)
+  const gridX = clampNumber(base.minX + Math.floor((totalCols - gridW) / 2), bounds.minX, bounds.maxX)
+  const ratio = store.data.searchBarPosition === 'top' ? 0.1
+    : store.data.searchBarPosition === 'bottom' ? 0.75
+      : 0.38
+  const offsetRows = Math.round(store.data.searchBarOffsetY / cellSize.value)
+  const gridY = clampNumber(base.minY + Math.round(ratio * totalRows) + offsetRows, bounds.minY, bounds.maxY)
+  return { gridX, gridY, gridW, gridH }
 })
 
 const iconImgStyle = computed(() => ({
@@ -165,6 +181,11 @@ function iconGridStyle(id: string, gridX: number, gridY: number) {
   return gridStyle(preview?.gridX ?? gridX, preview?.gridY ?? gridY)
 }
 
+function widgetGridStyle(w: { type: string; gridX: number; gridY: number; gridW: number; gridH: number }) {
+  const rect = w.type === 'search' && searchGridRect.value ? searchGridRect.value : w
+  return gridStyle(rect.gridX, rect.gridY, rect.gridW, rect.gridH)
+}
+
 function itemClass(id: string) {
   return {
     'is-dragging': isDragging.value && draggingId.value === id,
@@ -219,9 +240,11 @@ function buildOccupancySnapshot(excludeId?: string, usePreviewPositions = false)
 
   for (const w of store.data.widgets) {
     if (w.id === excludeId) continue
-    for (let dx = 0; dx < w.gridW; dx++) {
-      for (let dy = 0; dy < w.gridH; dy++) {
-        widgetCells.add(cellKey(w.gridX + dx, w.gridY + dy))
+    const rect = w.type === 'search' ? searchGridRect.value : w
+    if (!rect) continue
+    for (let dx = 0; dx < rect.gridW; dx++) {
+      for (let dy = 0; dy < rect.gridH; dy++) {
+        widgetCells.add(cellKey(rect.gridX + dx, rect.gridY + dy))
       }
     }
   }
@@ -238,28 +261,7 @@ function cloneOccupancySnapshot(snapshot: OccupancySnapshot): OccupancySnapshot 
 
 function isOccupiedInSnapshot(snapshot: OccupancySnapshot, col: number, row: number): boolean {
   const key = cellKey(col, row)
-  return snapshot.bookmarks.has(key) || snapshot.widgetCells.has(key) || isSearchWidgetArea(col, row)
-}
-
-function isSearchWidgetArea(col: number, row: number) {
-  if (!searchWidget.value) return false
-
-  const cell = cellSize.value
-  const offset = canvasOffset.value
-  const iconLeft = offset.x + col * cell
-  const iconTop = offset.y + row * cell
-  const iconRight = iconLeft + cell
-  const iconBottom = iconTop + cell
-  const searchWidth = Math.min(viewportWidth.value - 48, viewportWidth.value * store.data.searchBarWidth / 100)
-  const positionRatio = store.data.searchBarPosition === 'top' ? 0.1
-    : store.data.searchBarPosition === 'bottom' ? 0.75
-      : 0.38
-  const searchTop = viewportHeight.value * positionRatio + store.data.searchBarOffsetY
-  const searchBottom = searchTop + 76
-  const searchLeft = (viewportWidth.value - searchWidth) / 2
-  const searchRight = searchLeft + searchWidth
-
-  return iconLeft < searchRight && iconRight > searchLeft && iconTop < searchBottom && iconBottom > searchTop
+  return snapshot.bookmarks.has(key) || snapshot.widgetCells.has(key)
 }
 
 function isAreaOccupiedInSnapshot(
@@ -271,7 +273,7 @@ function isAreaOccupiedInSnapshot(
 ): boolean {
   for (let dx = 0; dx < gridW; dx++) {
     for (let dy = 0; dy < gridH; dy++) {
-      if (isOccupiedInSnapshot(snapshot, col + dx, row + dy) || isSearchWidgetArea(col + dx, row + dy)) return true
+      if (isOccupiedInSnapshot(snapshot, col + dx, row + dy)) return true
     }
   }
   return false
@@ -307,9 +309,63 @@ function pointerToGrid(x: number, y: number) {
   )
 }
 
+let layoutClampRaf = 0
+function scheduleLayoutClamp() {
+  if (layoutClampRaf) cancelAnimationFrame(layoutClampRaf)
+  layoutClampRaf = requestAnimationFrame(() => {
+    layoutClampRaf = 0
+    clampCurrentLayoutToViewport()
+  })
+}
+
+// Re-flow icons + Add button so nothing lands out of bounds or on top of a
+// widget (incl. the search bar) after the viewport shrinks or a search setting
+// changes. Icons keep their spot when it is still free, otherwise they slide to
+// the nearest free cell — never stacking, never overlapping the search bar.
+function clampCurrentLayoutToViewport() {
+  if (isDragging.value || pendingDrag.value) return
+
+  const snapshot: OccupancySnapshot = { bookmarks: new Map(), widgetCells: new Set() }
+  for (const w of store.data.widgets) {
+    const rect = w.type === 'search' ? searchGridRect.value : w
+    if (!rect) continue
+    for (let dx = 0; dx < rect.gridW; dx++) {
+      for (let dy = 0; dy < rect.gridH; dy++) {
+        snapshot.widgetCells.add(cellKey(rect.gridX + dx, rect.gridY + dy))
+      }
+    }
+  }
+
+  const patches: BookmarkPositionPatch[] = []
+  for (const bm of store.data.bookmarks) {
+    if (bm.gridX === undefined || bm.gridY === undefined) continue
+    const pos = findFreePositionInSnapshot(snapshot, bm.gridX, bm.gridY, 1, 1)
+    snapshot.bookmarks.set(cellKey(pos.gridX, pos.gridY), { ...bm, gridX: pos.gridX, gridY: pos.gridY })
+    if (pos.gridX !== bm.gridX || pos.gridY !== bm.gridY) {
+      patches.push({ id: bm.id, gridX: pos.gridX, gridY: pos.gridY })
+    }
+  }
+
+  let addChanged = false
+  if (store.data.showAddButton) {
+    const pos = findFreePositionInSnapshot(snapshot, store.data.addButtonGridX, store.data.addButtonGridY, 1, 1)
+    snapshot.bookmarks.set(cellKey(pos.gridX, pos.gridY), {
+      id: ADD_BTN_ID, name: 'Add', url: '', gridX: pos.gridX, gridY: pos.gridY, gridW: 1, gridH: 1,
+    })
+    if (pos.gridX !== store.data.addButtonGridX || pos.gridY !== store.data.addButtonGridY) {
+      store.moveAddButton(pos.gridX, pos.gridY)
+      addChanged = true
+    }
+  }
+
+  if (patches.length > 0) store.moveBookmarks(patches)
+  if (patches.length > 0 || addChanged) void store.save()
+}
+
 function updateViewportSize() {
   viewportWidth.value = window.innerWidth
   viewportHeight.value = window.innerHeight
+  scheduleLayoutClamp()
 }
 
 // ── Widget pointer down ──────────────────────────────────────
@@ -759,18 +815,15 @@ const componentMap: Record<string, typeof ClockWidget> = {
   bookmarks: BookmarkWidget,
 }
 
-const searchWidgetStyle = computed(() => {
-  const pos = store.data.searchBarPosition
-  const offset = store.data.searchBarOffsetY
-  const top = pos === 'top' ? `calc(10% + ${offset}px)` : pos === 'bottom' ? `calc(75% + ${offset}px)` : `calc(38% + ${offset}px)`
-  return {
-    position: 'absolute' as const,
-    left: '50%',
-    top,
-    width: `${store.data.searchBarWidth}%`,
-    transform: 'translateX(-50%)',
-  }
-})
+watch(
+  () => [
+    store.data.searchBarWidth,
+    store.data.searchBarPosition,
+    store.data.searchBarOffsetY,
+    store.data.iconSize,
+  ],
+  () => scheduleLayoutClamp(),
+)
 
 onMounted(() => {
   updateViewportSize()
@@ -781,6 +834,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (layoutClampRaf) cancelAnimationFrame(layoutClampRaf)
   window.removeEventListener('resize', updateViewportSize)
   window.removeEventListener('pointermove', onWindowPointerMove)
   window.removeEventListener('pointerup', onWindowPointerUp)
@@ -793,7 +847,7 @@ onUnmounted(() => {
     <!-- ── Widgets (free-form grid) ─────────────────────────── -->
     <div v-for="w in store.data.widgets" :key="w.id" class="canvas-item widget-item"
       :class="[itemClass(w.id), { 'search-widget-shell': w.type === 'search' }]"
-      :style="w.type === 'search' ? searchWidgetStyle : gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
+      :style="widgetGridStyle(w)"
       @pointerdown="w.type === 'search' ? undefined : onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)">
       <button v-if="w.type !== 'search'" class="item-del" @click.stop="store.removeWidget(w.id)" title="Remove">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
