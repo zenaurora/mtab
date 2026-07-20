@@ -8,6 +8,7 @@ import NotesWidget from './widgets/NotesWidget.vue'
 import SearchWidget from './widgets/SearchWidget.vue'
 import BookmarkWidget from './widgets/BookmarkWidget.vue'
 import BookmarkIcon from './BookmarkIcon.vue'
+import { fileToIconDataUrl, ICON_ACCEPT_ATTR, IconUploadError } from '../utils/iconUpload'
 
 const store = useSettingsStore()
 
@@ -763,6 +764,10 @@ const editingId = ref<string | null>(null)
 const modalName = ref('')
 const modalUrl = ref('')
 const modalIconUrl = ref('')
+const iconFileInput = ref<HTMLInputElement | null>(null)
+const iconUploading = ref(false)
+const iconUploadError = ref('')
+const isDataUrlIcon = computed(() => modalIconUrl.value.startsWith('data:'))
 
 function openAddModal() {
   if (justDragged) return
@@ -770,6 +775,7 @@ function openAddModal() {
   modalName.value = ''
   modalUrl.value = ''
   modalIconUrl.value = ''
+  iconUploadError.value = ''
   showModal.value = true
 }
 
@@ -778,10 +784,37 @@ function openEditModal(bm: Bookmark) {
   modalName.value = bm.name
   modalUrl.value = bm.url
   modalIconUrl.value = bm.iconUrl ?? ''
+  iconUploadError.value = ''
   showModal.value = true
 }
 
 function closeModal() { showModal.value = false }
+
+function triggerIconUpload() {
+  iconFileInput.value?.click()
+}
+
+async function onIconFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // allow re-selecting the same file
+  if (!file) return
+  iconUploadError.value = ''
+  iconUploading.value = true
+  try {
+    modalIconUrl.value = await fileToIconDataUrl(file)
+  } catch (err) {
+    iconUploadError.value =
+      err instanceof IconUploadError ? err.message : '图标处理失败，请换一张图片'
+  } finally {
+    iconUploading.value = false
+  }
+}
+
+function clearIcon() {
+  modalIconUrl.value = ''
+  iconUploadError.value = ''
+}
 
 function onModalKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && showModal.value) {
@@ -935,8 +968,32 @@ onUnmounted(() => {
             <input v-model="modalUrl" placeholder="github.com" @keydown.enter="submitModal" autofocus />
           </div>
           <div class="modal-field">
-            <label>Icon URL (optional)</label>
-            <input v-model="modalIconUrl" placeholder="https://example.com/favicon.ico" @keydown.enter="submitModal" />
+            <label>Icon (optional)</label>
+            <div v-if="isDataUrlIcon" class="icon-upload-preview">
+              <img :src="modalIconUrl" alt="icon preview" />
+              <span class="icon-upload-name">已上传自定义图标</span>
+              <button type="button" @click="clearIcon">移除</button>
+            </div>
+            <input
+              v-else
+              v-model="modalIconUrl"
+              placeholder="https://example.com/favicon.ico"
+              @keydown.enter="submitModal"
+            />
+            <div class="icon-upload-row">
+              <button type="button" @click="triggerIconUpload" :disabled="iconUploading">
+                {{ iconUploading ? '处理中…' : isDataUrlIcon ? '更换图片' : '上传图片' }}
+              </button>
+              <span class="icon-upload-hint">支持 SVG / PNG / JPG / WebP / GIF</span>
+            </div>
+            <p v-if="iconUploadError" class="icon-upload-error">{{ iconUploadError }}</p>
+            <input
+              ref="iconFileInput"
+              type="file"
+              class="icon-upload-input"
+              :accept="ICON_ACCEPT_ATTR"
+              @change="onIconFileChange"
+            />
           </div>
           <div class="modal-actions">
             <button @click="closeModal">Cancel</button>
@@ -1171,6 +1228,51 @@ onUnmounted(() => {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.icon-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-upload-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.icon-upload-input {
+  display: none;
+}
+
+.icon-upload-error {
+  margin: 0;
+  font-size: 12px;
+  color: #f87171;
+}
+
+.icon-upload-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-glass);
+}
+
+.icon-upload-preview img {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--bg-glass);
+}
+
+.icon-upload-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .modal-fade-enter-active,
