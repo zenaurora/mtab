@@ -8,6 +8,11 @@ function sampleStep(length: number) {
 }
 
 export function shouldRejectLoadedFavicon(img: HTMLImageElement): boolean {
+  // User-supplied data URL icons (uploads / manual input) are trusted as-is;
+  // this heuristic only exists to filter junk from auto-guessed favicon URLs.
+  const src = img.currentSrc || img.src
+  if (src.startsWith('data:')) return false
+
   const width = img.naturalWidth || img.width
   const height = img.naturalHeight || img.height
 

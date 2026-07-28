@@ -50,9 +50,8 @@ function onImgError() {
 
 function onImgLoad(event: Event) {
   const img = event.target as HTMLImageElement
-  // User-uploaded icons (data URLs) are trusted as-is; the favicon heuristic
-  // only exists to filter junk from auto-guessed favicon URLs.
-  if (!iconSrc.value.startsWith('data:') && shouldRejectLoadedFavicon(img)) {
+  // shouldRejectLoadedFavicon already trusts data URL icons as-is.
+  if (shouldRejectLoadedFavicon(img)) {
     advanceOrFail()
     return
   }

@@ -767,7 +767,11 @@ const modalIconUrl = ref('')
 const iconFileInput = ref<HTMLInputElement | null>(null)
 const iconUploading = ref(false)
 const iconUploadError = ref('')
-const isDataUrlIcon = computed(() => modalIconUrl.value.startsWith('data:'))
+// Only treat a *complete* data URL (i.e. produced by the upload pipeline) as
+// an uploaded icon, so typing "data:" by hand doesn't swap the input away.
+const isDataUrlIcon = computed(() =>
+  /^data:image\/[a-z+.-]+;base64,/i.test(modalIconUrl.value),
+)
 
 function openAddModal() {
   if (justDragged) return
@@ -984,7 +988,7 @@ onUnmounted(() => {
               <button type="button" @click="triggerIconUpload" :disabled="iconUploading">
                 {{ iconUploading ? '处理中…' : isDataUrlIcon ? '更换图片' : '上传图片' }}
               </button>
-              <span class="icon-upload-hint">支持 SVG / PNG / JPG / WebP / GIF</span>
+              <span class="icon-upload-hint">支持 SVG / PNG / JPG / WebP</span>
             </div>
             <p v-if="iconUploadError" class="icon-upload-error">{{ iconUploadError }}</p>
             <input
