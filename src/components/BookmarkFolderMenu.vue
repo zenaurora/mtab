@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+
 defineOptions({ name: 'BookmarkFolderMenu' })
 
 export type BookmarkMenuItem = {
@@ -18,6 +20,8 @@ const emit = defineEmits<{
   expand: [item: BookmarkMenuItem]
 }>()
 
+const openFolderId = ref<string | null>(null)
+
 function itemLabel(item: BookmarkMenuItem) {
   if (item.title) return item.title
   if (!item.url) return 'Untitled'
@@ -35,6 +39,11 @@ function visibleChildren(item: BookmarkMenuItem) {
 function expandFolder(item: BookmarkMenuItem) {
   emit('expand', item)
 }
+
+function toggleFolder(item: BookmarkMenuItem) {
+  expandFolder(item)
+  openFolderId.value = openFolderId.value === item.id ? null : item.id
+}
 </script>
 
 <template>
@@ -51,7 +60,12 @@ function expandFolder(item: BookmarkMenuItem) {
       </button>
 
       <div v-else class="folder-menu-folder" @mouseenter="expandFolder(item)" @focusin="expandFolder(item)">
-        <button class="folder-menu-item" :title="itemLabel(item)" @click.stop="expandFolder(item)">
+        <button
+          class="folder-menu-item"
+          :title="itemLabel(item)"
+          :aria-expanded="openFolderId === item.id"
+          @click.stop="toggleFolder(item)"
+        >
           <span class="folder-icon"></span>
           <span>{{ itemLabel(item) }}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -61,6 +75,7 @@ function expandFolder(item: BookmarkMenuItem) {
         <BookmarkFolderMenu
           v-if="visibleChildren(item).length"
           class="folder-submenu"
+          :class="{ 'is-open': openFolderId === item.id }"
           :items="visibleChildren(item)"
           @open="emit('open', $event)"
           @expand="emit('expand', $event)"

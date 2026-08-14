@@ -471,12 +471,22 @@ function recomputeVisibleItems() {
 }
 
 :deep(.folder-submenu) {
-  top: -5px;
-  left: calc(100% + 4px);
+  position: static;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  margin: 2px 0 2px 12px;
+  padding: 2px 0 2px 6px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 :deep(.folder-menu-folder:hover > .folder-submenu),
-:deep(.folder-menu-folder:focus-within > .folder-submenu) {
+:deep(.folder-menu-folder:focus-within > .folder-submenu),
+:deep(.folder-submenu.is-open) {
   display: flex;
 }
 
