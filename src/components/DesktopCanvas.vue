@@ -691,12 +691,6 @@ function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
   for (const patch of plan.patches) {
     previewPositions[patch.id] = { gridX: patch.gridX, gridY: patch.gridY }
   }
-  if (store.data.showAddButton) {
-    previewPositions[ADD_BTN_ID] = {
-      gridX: store.data.addButtonGridX,
-      gridY: store.data.addButtonGridY,
-    }
-  }
   lastDropPlan = plan
   return plan
 }
