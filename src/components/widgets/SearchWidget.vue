@@ -37,7 +37,7 @@ function doSearch() {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') doSearch()
+  if (e.key === 'Enter' && !e.isComposing) doSearch()
   if (e.key === 'Escape') showEngineMenu.value = false
 }
 </script>
