@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
-import type { MTabConfig } from '../../types'
 
 const store = useSettingsStore()
 const importInput = ref<HTMLInputElement | null>(null)
@@ -34,7 +33,7 @@ function onImportFile(e: Event) {
   const reader = new FileReader()
   reader.onload = () => {
     try {
-      const config = JSON.parse(reader.result as string) as MTabConfig
+      const config: unknown = JSON.parse(reader.result as string)
       store.importConfig(config)
       showMsg('Config imported successfully!', 'success')
     } catch (err) {

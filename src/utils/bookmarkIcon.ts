@@ -1,4 +1,5 @@
 import type { Bookmark } from '../types'
+import { extractDomain } from './url'
 
 type BookmarkLike = Pick<Bookmark, 'name' | 'url' | 'iconUrl'>
 
@@ -14,14 +15,6 @@ export function faviconCandidates(bookmark: Pick<BookmarkLike, 'url' | 'iconUrl'
     return candidates
   }
   return Array.from(new Set(candidates.filter(Boolean)))
-}
-
-export function extractDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
 }
 
 export function displayBookmarkName(bookmark: Pick<BookmarkLike, 'name' | 'url'>): string {

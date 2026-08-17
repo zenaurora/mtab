@@ -2,6 +2,15 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { loadStorageValue, removeStorageValue, useStorage } from '../composables/useStorage'
 import { loadLargeStorageValue, saveLargeStorageValue } from '../composables/useLargeStorage'
+import {
+  createGridSnapshot,
+  findFirstFreePosition,
+  findNearestFreePosition,
+  occupyMovable,
+  type GridBounds,
+  type MovableGridItem,
+} from '../layout/gridLayout'
+import { parseImportedConfig } from '../config/importConfig'
 import type {
   Settings,
   SearchEngine,
@@ -79,12 +88,6 @@ const DEFAULT_SETTINGS: Settings = {
       gridY: 2,
       gridW: 6,
       gridH: 2,
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      order: 0,
-      config: {},
     },
   ],
   bookmarks: DEFAULT_BOOKMARKS,
@@ -100,6 +103,7 @@ const SETTINGS_KEY = 'mtab_settings'
 const WALLPAPER_BASE64_KEY = 'mtab_wallpaper_base64'
 const LEGACY_SEARCH_HISTORY_KEY = 'mtab_search_history'
 const LOCAL_WALLPAPER_SOURCE = '__local_wallpaper_base64__'
+const STORAGE_GRID: GridBounds = { minX: 0, minY: 0, maxX: 19, maxY: 29 }
 
 let uid = 0
 function genId(prefix = 'id'): string {
@@ -281,22 +285,21 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Find a free spot on the grid (considers widgets + positioned bookmarks)
   function findFreePosition(gridW: number, gridH: number, startRow = 0): { gridX: number; gridY: number } {
-    const maxCols = 20
-    for (let row = startRow; row < 30; row++) {
-      for (let col = 0; col < maxCols; col++) {
-        const widgetOccupied = data.value.widgets.some((w) =>
-          col < w.gridX + w.gridW && col + gridW > w.gridX &&
-          row < w.gridY + w.gridH && row + gridH > w.gridY
-        )
-        const bmOccupied = data.value.bookmarks.some((b) =>
-          b.gridX !== undefined && b.gridY !== undefined &&
-          col < (b.gridX ?? 0) + (b.gridW ?? 1) && col + gridW > (b.gridX ?? 0) &&
-          row < (b.gridY ?? 0) + (b.gridH ?? 1) && row + gridH > (b.gridY ?? 0)
-        )
-        if (!widgetOccupied && !bmOccupied) return { gridX: col, gridY: row }
-      }
+    const movableItems = positionedBookmarks()
+    if (data.value.showAddButton) {
+      movableItems.push({
+        id: '__add_btn__',
+        gridX: data.value.addButtonGridX,
+        gridY: data.value.addButtonGridY,
+      })
     }
-    return { gridX: 0, gridY: startRow }
+    const snapshot = createGridSnapshot(movableItems, data.value.widgets)
+    return findFirstFreePosition(
+      snapshot,
+      { gridW, gridH },
+      boundsForSize(gridW, gridH),
+      startRow,
+    )
   }
 
   function addWidget(type: WidgetType) {
@@ -309,9 +312,6 @@ export const useSettingsStore = defineStore('settings', () => {
       gridY: pos.gridY,
       gridW: size.gridW,
       gridH: size.gridH,
-      // Legacy fields
-      x: 0, y: 0, width: 0, height: 0, order: 0,
-      config: {},
     }
     data.value.widgets.push(widget)
   }
@@ -415,18 +415,11 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  function importConfig(config: MTabConfig) {
-    if (!config || config.version !== 1 || !config.settings) {
-      throw new Error('Invalid mtab config file')
-    }
-    const {
-      wallpaperUrl: _wallpaperUrl,
-      wallpaperBase64: _wallpaperBase64,
-      wallpaperColor: _wallpaperColor,
-      wallpaperHistory: _wallpaperHistory,
-      ...rest
-    } = config.settings
-    Object.assign(data.value, rest)
+  function importConfig(config: unknown) {
+    const imported = parseImportedConfig(config, data.value)
+    Object.assign(data.value, imported)
+    normalizeSettingsShape()
+    normalizeLayoutPositions()
   }
 
   // ── Migration ──────────────────────────────────────────
@@ -494,12 +487,6 @@ export const useSettingsStore = defineStore('settings', () => {
         gridY: 2,
         gridW: 6,
         gridH: 1,
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0,
-        order: 0,
-        config: {},
       })
     }
     if (!Array.isArray(data.value.bookmarks)) {
@@ -511,40 +498,30 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   function normalizeLayoutPositions() {
-    const occupied = new Set<string>()
-    const key = (gridX: number, gridY: number) => `${gridX},${gridY}`
-
-    for (const w of data.value.widgets) {
-      for (let dx = 0; dx < w.gridW; dx++) {
-        for (let dy = 0; dy < w.gridH; dy++) {
-          occupied.add(key(w.gridX + dx, w.gridY + dy))
-        }
-      }
-    }
+    const snapshot = createGridSnapshot([], data.value.widgets)
+    const iconSize = { gridW: 1, gridH: 1 }
+    const iconBounds = boundsForSize(1, 1)
 
     for (const bm of data.value.bookmarks) {
       const gridX = bm.gridX ?? 0
       const gridY = bm.gridY ?? 0
-      const currentKey = key(gridX, gridY)
-      if (occupied.has(currentKey)) {
-        const pos = findFreePositionIgnoringOccupied(occupied)
-        bm.gridX = pos.gridX
-        bm.gridY = pos.gridY
-        occupied.add(key(pos.gridX, pos.gridY))
-      } else {
-        occupied.add(currentKey)
-      }
+      const position = findNearestFreePosition(snapshot, { gridX, gridY }, iconSize, iconBounds)
+      bm.gridX = position.gridX
+      bm.gridY = position.gridY
       bm.gridW = 1
       bm.gridH = 1
+      occupyMovable(snapshot, { id: bm.id, ...position })
     }
 
     if (data.value.showAddButton) {
-      const addKey = key(data.value.addButtonGridX, data.value.addButtonGridY)
-      if (occupied.has(addKey)) {
-        const pos = findFreePositionIgnoringOccupied(occupied)
-        data.value.addButtonGridX = pos.gridX
-        data.value.addButtonGridY = pos.gridY
-      }
+      const position = findNearestFreePosition(
+        snapshot,
+        { gridX: data.value.addButtonGridX, gridY: data.value.addButtonGridY },
+        iconSize,
+        iconBounds,
+      )
+      data.value.addButtonGridX = position.gridX
+      data.value.addButtonGridY = position.gridY
     }
   }
 
@@ -578,14 +555,20 @@ export const useSettingsStore = defineStore('settings', () => {
     return migrateLegacyWallpaperBase64()
   }
 
-  function findFreePositionIgnoringOccupied(occupied: Set<string>) {
-    const maxCols = 20
-    for (let row = 0; row < 30; row++) {
-      for (let col = 0; col < maxCols; col++) {
-        if (!occupied.has(`${col},${row}`)) return { gridX: col, gridY: row }
-      }
+  function positionedBookmarks(): MovableGridItem[] {
+    return data.value.bookmarks.flatMap((bookmark) =>
+      bookmark.gridX === undefined || bookmark.gridY === undefined
+        ? []
+        : [{ id: bookmark.id, gridX: bookmark.gridX, gridY: bookmark.gridY }],
+    )
+  }
+
+  function boundsForSize(gridW: number, gridH: number): GridBounds {
+    return {
+      ...STORAGE_GRID,
+      maxX: Math.max(STORAGE_GRID.minX, STORAGE_GRID.maxX - gridW + 1),
+      maxY: Math.max(STORAGE_GRID.minY, STORAGE_GRID.maxY - gridH + 1),
     }
-    return { gridX: 0, gridY: 0 }
   }
 
   return {

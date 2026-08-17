@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
+import { buildSearchUrl, isSearchSubmitKey } from '../../search/searchNavigation'
 
 const store = useSettingsStore()
 const query = ref('')
@@ -30,14 +31,12 @@ function selectEngine(id: string) {
 }
 
 function doSearch() {
-  const q = query.value.trim()
-  if (!q || !activeEngine.value) return
-  const url = activeEngine.value.urlTemplate.replace('{query}', encodeURIComponent(q))
-  window.location.href = url
+  const url = buildSearchUrl(query.value, activeEngine.value)
+  if (url) window.location.href = url
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.isComposing) doSearch()
+  if (isSearchSubmitKey(e)) doSearch()
   if (e.key === 'Escape') showEngineMenu.value = false
 }
 </script>

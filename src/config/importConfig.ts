@@ -1,0 +1,177 @@
+import type { Bookmark, SearchEngine, Settings, Widget, WidgetType } from '../types'
+import { THEME_IDS } from '../themes'
+
+const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks', 'search'])
+const SEARCH_POSITIONS = new Set<Settings['searchBarPosition']>(['top', 'center', 'bottom'])
+
+export function parseImportedConfig(input: unknown, current: Settings): Settings {
+  const config = expectRecord(input, 'Config')
+  if (config.version !== 1) throw new Error('Unsupported mtab config version')
+  const raw = expectRecord(config.settings, 'Config settings')
+  const next = cloneSettings(current)
+
+  if ('theme' in raw) next.theme = expectMember(raw.theme, THEME_IDS, 'theme')
+  if ('iconSize' in raw) next.iconSize = expectNumber(raw.iconSize, 'iconSize', 40, 96)
+  if ('blurAmount' in raw) next.blurAmount = expectNumber(raw.blurAmount, 'blurAmount', 0, 30)
+  if ('searchBarWidth' in raw) {
+    next.searchBarWidth = expectNumber(raw.searchBarWidth, 'searchBarWidth', 20, 80)
+  }
+  if ('searchBarPosition' in raw) {
+    next.searchBarPosition = expectMember(raw.searchBarPosition, SEARCH_POSITIONS, 'searchBarPosition')
+  }
+  if ('searchBarOffsetY' in raw) {
+    next.searchBarOffsetY = expectNumber(raw.searchBarOffsetY, 'searchBarOffsetY', -200, 200)
+  }
+  if ('activeEngineId' in raw) next.activeEngineId = expectString(raw.activeEngineId, 'activeEngineId')
+  if ('searchEngines' in raw) next.searchEngines = parseSearchEngines(raw.searchEngines)
+  if ('darkMode' in raw) next.darkMode = expectBoolean(raw.darkMode, 'darkMode')
+  if ('performanceMode' in raw) {
+    next.performanceMode = expectBoolean(raw.performanceMode, 'performanceMode')
+  }
+  if ('widgets' in raw) next.widgets = parseWidgets(raw.widgets)
+  if ('bookmarks' in raw) next.bookmarks = parseBookmarks(raw.bookmarks)
+  if ('defaultBookmarkSeedVersion' in raw) {
+    next.defaultBookmarkSeedVersion = expectInteger(
+      raw.defaultBookmarkSeedVersion,
+      'defaultBookmarkSeedVersion',
+      0,
+    )
+  }
+  if ('showBrowserBookmarkBar' in raw) {
+    next.showBrowserBookmarkBar = expectBoolean(raw.showBrowserBookmarkBar, 'showBrowserBookmarkBar')
+  }
+  if ('showAddButton' in raw) {
+    next.showAddButton = expectBoolean(raw.showAddButton, 'showAddButton')
+  }
+  if ('addButtonGridX' in raw) {
+    next.addButtonGridX = expectInteger(raw.addButtonGridX, 'addButtonGridX', 0)
+  }
+  if ('addButtonGridY' in raw) {
+    next.addButtonGridY = expectInteger(raw.addButtonGridY, 'addButtonGridY', 0)
+  }
+  if ('notesContent' in raw) next.notesContent = expectString(raw.notesContent, 'notesContent')
+
+  if (!next.searchEngines.some((engine) => engine.id === next.activeEngineId)) {
+    next.activeEngineId = next.searchEngines[0]?.id ?? ''
+  }
+
+  return next
+}
+
+function parseSearchEngines(value: unknown): SearchEngine[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('searchEngines must be a non-empty array')
+  }
+  const engines = value.map((entry, index) => {
+    const engine = expectRecord(entry, `searchEngines[${index}]`)
+    const parsed: SearchEngine = {
+      id: expectString(engine.id, `searchEngines[${index}].id`, true),
+      name: expectString(engine.name, `searchEngines[${index}].name`, true),
+      urlTemplate: expectString(engine.urlTemplate, `searchEngines[${index}].urlTemplate`, true),
+    }
+    if (!parsed.urlTemplate.includes('{query}')) {
+      throw new Error(`searchEngines[${index}].urlTemplate must contain {query}`)
+    }
+    if (engine.icon !== undefined) {
+      parsed.icon = expectString(engine.icon, `searchEngines[${index}].icon`)
+    }
+    return parsed
+  })
+  assertUniqueIds(engines, 'searchEngines')
+  return engines
+}
+
+function parseWidgets(value: unknown): Widget[] {
+  if (!Array.isArray(value)) throw new Error('widgets must be an array')
+  const widgets = value.map((entry, index) => {
+    const widget = expectRecord(entry, `widgets[${index}]`)
+    return {
+      id: expectString(widget.id, `widgets[${index}].id`, true),
+      type: expectMember(widget.type, WIDGET_TYPES, `widgets[${index}].type`),
+      gridX: expectInteger(widget.gridX, `widgets[${index}].gridX`, 0),
+      gridY: expectInteger(widget.gridY, `widgets[${index}].gridY`, 0),
+      gridW: expectInteger(widget.gridW, `widgets[${index}].gridW`, 1),
+      gridH: expectInteger(widget.gridH, `widgets[${index}].gridH`, 1),
+    }
+  })
+  assertUniqueIds(widgets, 'widgets')
+  return widgets
+}
+
+function parseBookmarks(value: unknown): Bookmark[] {
+  if (!Array.isArray(value)) throw new Error('bookmarks must be an array')
+  const bookmarks = value.map((entry, index) => {
+    const bookmark = expectRecord(entry, `bookmarks[${index}]`)
+    const parsed: Bookmark = {
+      id: expectString(bookmark.id, `bookmarks[${index}].id`, true),
+      name: expectString(bookmark.name, `bookmarks[${index}].name`),
+      url: expectString(bookmark.url, `bookmarks[${index}].url`, true),
+    }
+    if (bookmark.iconUrl !== undefined) {
+      parsed.iconUrl = expectString(bookmark.iconUrl, `bookmarks[${index}].iconUrl`)
+    }
+    if (bookmark.gridX !== undefined) {
+      parsed.gridX = expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`, 0)
+    }
+    if (bookmark.gridY !== undefined) {
+      parsed.gridY = expectInteger(bookmark.gridY, `bookmarks[${index}].gridY`, 0)
+    }
+    parsed.gridW = 1
+    parsed.gridH = 1
+    return parsed
+  })
+  assertUniqueIds(bookmarks, 'bookmarks')
+  return bookmarks
+}
+
+function expectRecord(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`)
+  }
+  return value as Record<string, unknown>
+}
+
+function expectString(value: unknown, label: string, nonEmpty = false): string {
+  if (typeof value !== 'string' || (nonEmpty && value.trim() === '')) {
+    throw new Error(`${label} must be ${nonEmpty ? 'a non-empty string' : 'a string'}`)
+  }
+  return value
+}
+
+function expectBoolean(value: unknown, label: string): boolean {
+  if (typeof value !== 'boolean') throw new Error(`${label} must be a boolean`)
+  return value
+}
+
+function expectNumber(value: unknown, label: string, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    throw new Error(`${label} must be a number between ${min} and ${max}`)
+  }
+  return value
+}
+
+function expectInteger(value: unknown, label: string, min: number): number {
+  if (!Number.isInteger(value) || (value as number) < min) {
+    throw new Error(`${label} must be an integer greater than or equal to ${min}`)
+  }
+  return value as number
+}
+
+function expectMember<T extends string>(value: unknown, allowed: Set<T>, label: string): T {
+  if (typeof value !== 'string' || !allowed.has(value as T)) {
+    throw new Error(`${label} has an unsupported value`)
+  }
+  return value as T
+}
+
+function assertUniqueIds(items: Array<{ id: string }>, label: string): void {
+  const ids = new Set<string>()
+  for (const item of items) {
+    if (ids.has(item.id)) throw new Error(`${label} contains duplicate id "${item.id}"`)
+    ids.add(item.id)
+  }
+}
+
+function cloneSettings(settings: Settings): Settings {
+  return JSON.parse(JSON.stringify(settings)) as Settings
+}

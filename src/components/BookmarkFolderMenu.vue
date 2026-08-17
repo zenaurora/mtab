@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { extractDomain } from '../utils/url'
 
 defineOptions({ name: 'BookmarkFolderMenu' })
 
@@ -25,11 +26,7 @@ const openFolderId = ref<string | null>(null)
 function itemLabel(item: BookmarkMenuItem) {
   if (item.title) return item.title
   if (!item.url) return 'Untitled'
-  try {
-    return new URL(item.url).hostname.replace(/^www\./, '')
-  } catch {
-    return item.url
-  }
+  return extractDomain(item.url)
 }
 
 function visibleChildren(item: BookmarkMenuItem) {

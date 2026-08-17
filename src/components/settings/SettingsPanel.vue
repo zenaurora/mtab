@@ -4,7 +4,9 @@ import { useSettingsStore } from '../../stores/settings'
 import WallpaperPicker from './WallpaperPicker.vue'
 import SearchEngineCfg from './SearchEngineCfg.vue'
 import ConfigIO from './ConfigIO.vue'
-import type { WidgetType, ThemeId } from '../../types'
+import type { WidgetType } from '../../types'
+import { THEMES } from '../../themes'
+import { ensureHttpUrl } from '../../utils/url'
 
 const store = useSettingsStore()
 const activeTab = ref<'theme' | 'wallpaper' | 'search' | 'widgets' | 'bookmarks' | 'config'>('theme')
@@ -18,15 +20,6 @@ const tabs = [
   { id: 'config' as const, label: 'Config' },
 ]
 
-interface ThemeOption { id: ThemeId; label: string; accent: string; bg: string }
-const themeOptions: ThemeOption[] = [
-  { id: 'default',    label: 'Default',    accent: '#6366f1', bg: '#1a1a2e' },
-  { id: 'gruvbox',    label: 'Gruvbox',    accent: '#d79921', bg: '#282828' },
-  { id: 'catppuccin', label: 'Catppuccin', accent: '#cba6f7', bg: '#1e1e2e' },
-  { id: 'everforest', label: 'Everforest', accent: '#a7c080', bg: '#2b3339' },
-  { id: 'shadcn',     label: 'Shadcn',     accent: '#e4e4e7', bg: '#09090b' },
-]
-
 // Bookmark form
 const bmName = ref('')
 const bmUrl = ref('')
@@ -34,9 +27,7 @@ const bmUrl = ref('')
 function addBookmark() {
   const url = bmUrl.value.trim()
   if (!url) return
-  let finalUrl = url
-  if (!/^https?:\/\//.test(finalUrl)) finalUrl = 'https://' + finalUrl
-  store.addBookmark({ name: bmName.value.trim(), url: finalUrl })
+  store.addBookmark({ name: bmName.value.trim(), url: ensureHttpUrl(url) })
   bmName.value = ''
   bmUrl.value = ''
 }
@@ -86,7 +77,7 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
         <h4>Color Theme</h4>
         <div class="theme-grid">
           <button
-            v-for="t in themeOptions"
+            v-for="t in THEMES"
             :key="t.id"
             class="theme-swatch"
             :class="{ active: store.data.theme === t.id }"

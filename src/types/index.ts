@@ -1,11 +1,6 @@
-// Theme
-export type ThemeId = 'default' | 'gruvbox' | 'catppuccin' | 'everforest' | 'shadcn'
+import type { ThemeId } from '../themes'
 
-export interface ThemeInfo {
-  id: ThemeId
-  label: string
-  preview: string // accent color hex
-}
+export type { ThemeId } from '../themes'
 
 // Search engine configuration
 export interface SearchEngine {
@@ -27,13 +22,6 @@ export interface Widget {
   // Fixed size per widget type (in grid cells)
   gridW: number   // width in cells
   gridH: number   // height in cells
-  // Legacy (kept for import compat)
-  x: number
-  y: number
-  width: number
-  height: number
-  order: number
-  config: Record<string, unknown>
 }
 
 // Bookmark item

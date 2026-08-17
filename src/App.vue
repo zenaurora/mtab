@@ -6,6 +6,7 @@ import DesktopCanvas from './components/DesktopCanvas.vue'
 import BrowserBookmarkBar from './components/BrowserBookmarkBar.vue'
 import SearchHistorySidebar from './components/SearchHistorySidebar.vue'
 import SettingsPanel from './components/settings/SettingsPanel.vue'
+import { themeClassFor } from './themes'
 
 const store = useSettingsStore()
 const showSettings = ref(false)
@@ -28,14 +29,7 @@ function onWindowKeydown(e: KeyboardEvent) {
 }
 
 // Compute the active theme class
-const themeClass = computed(() => {
-  const t = store.data.theme
-  if (t === 'gruvbox') return 'theme-gruvbox'
-  if (t === 'catppuccin') return 'theme-catppuccin'
-  if (t === 'everforest') return 'theme-everforest'
-  if (t === 'shadcn') return 'theme-shadcn'
-  return ''
-})
+const themeClass = computed(() => themeClassFor(store.data.theme))
 
 // Apply theme + dark/light class to html element
 watch(

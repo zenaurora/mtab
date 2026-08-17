@@ -2,12 +2,11 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import BookmarkFolderMenu, { type BookmarkMenuItem } from './BookmarkFolderMenu.vue'
+import { extractDomain } from '../utils/url'
 
 const store = useSettingsStore()
 
-type BookmarkBarItem = BookmarkMenuItem
-
-const bookmarkBar = ref<BookmarkBarItem[]>([])
+const bookmarkBar = ref<BookmarkMenuItem[]>([])
 const barEl = ref<HTMLElement | null>(null)
 const measureEl = ref<HTMLElement | null>(null)
 const openFolderId = ref<string | null>(null)
@@ -20,7 +19,6 @@ const visibleItems = computed(() =>
   bookmarkBar.value.filter((item) => item.title || item.url || item.children?.length)
 )
 
-const barLabel = computed(() => 'Chrome bookmarks bar')
 const layoutKey = computed(() =>
   visibleItems.value.map((item) => `${item.id}:${item.title}:${item.url ? 'u' : 'f'}`).join('|')
 )
@@ -98,7 +96,7 @@ function loadBrowserBookmarksFromTree() {
   })
 }
 
-function normalizeChromeBookmark(item: chrome.bookmarks.BookmarkTreeNode): BookmarkBarItem {
+function normalizeChromeBookmark(item: chrome.bookmarks.BookmarkTreeNode): BookmarkMenuItem {
   return {
     id: item.id,
     title: item.title,
@@ -108,7 +106,7 @@ function normalizeChromeBookmark(item: chrome.bookmarks.BookmarkTreeNode): Bookm
   }
 }
 
-function loadFolderChildren(item: BookmarkBarItem) {
+function loadFolderChildren(item: BookmarkMenuItem) {
   if (item.url || item.childrenLoaded) return
   if (typeof chrome === 'undefined' || !chrome.bookmarks?.getChildren) {
     item.children = []
@@ -126,24 +124,20 @@ function loadFolderChildren(item: BookmarkBarItem) {
   })
 }
 
-function itemLabel(item: BookmarkBarItem) {
+function itemLabel(item: BookmarkMenuItem) {
   if (item.title) return item.title
   if (!item.url) return 'Untitled'
-  try {
-    return new URL(item.url).hostname.replace(/^www\./, '')
-  } catch {
-    return item.url
-  }
+  return extractDomain(item.url)
 }
 
-function openBookmark(item: BookmarkBarItem) {
+function openBookmark(item: BookmarkMenuItem) {
   if (!item.url) return
   openFolderId.value = null
   moreMenuOpen.value = false
   window.location.href = item.url
 }
 
-function toggleFolder(item: BookmarkBarItem) {
+function toggleFolder(item: BookmarkMenuItem) {
   if (item.url) return
   loadFolderChildren(item)
   moreMenuOpen.value = false
@@ -227,7 +221,7 @@ function recomputeVisibleItems() {
     v-if="store.data.showBrowserBookmarkBar && visibleItems.length"
     ref="barEl"
     class="browser-bookmark-bar"
-    :aria-label="barLabel"
+    aria-label="Chrome bookmarks bar"
   >
     <div class="browser-bookmark-content">
       <template v-for="item in primaryItems" :key="item.id">

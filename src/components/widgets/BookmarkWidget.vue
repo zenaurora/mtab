@@ -1,47 +1,11 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
-import { displayBookmarkName, faviconCandidates } from '../../utils/bookmarkIcon'
-import { shouldRejectLoadedFavicon } from '../../utils/faviconValidation'
+import { displayBookmarkName } from '../../utils/bookmarkIcon'
+import FaviconImage from '../FaviconImage.vue'
 
 const store = useSettingsStore()
 const bookmarks = computed(() => store.data.bookmarks)
-const failedIconKeys = reactive(new Set<string>())
-
-function faviconUrl(bookmark: { id: string; url: string; iconUrl?: string }): string {
-  if (failedIconKeys.has(bookmark.id)) return ''
-  return faviconCandidates(bookmark)[0] ?? ''
-}
-
-function advanceIcon(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
-  const img = event.target as HTMLImageElement
-  const candidates = faviconCandidates(bookmark)
-  const currentIndex = candidates.indexOf(img.currentSrc || img.src)
-  const nextSrc = candidates[currentIndex + 1]
-  if (nextSrc) {
-    img.src = nextSrc
-    return
-  }
-  failedIconKeys.add(bookmark.id)
-}
-
-function siteName(bm: { name: string; url: string }): string {
-  return displayBookmarkName(bm)
-}
-
-function onIconError(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
-  advanceIcon(bookmark, event)
-}
-
-function onIconLoad(bookmark: { id: string; url: string; iconUrl?: string }, event: Event) {
-  const img = event.target as HTMLImageElement
-  if (shouldRejectLoadedFavicon(img)) {
-    advanceIcon(bookmark, event)
-    return
-  }
-
-  failedIconKeys.delete(bookmark.id)
-}
 
 function navigate(url: string) {
   window.location.href = url
@@ -71,18 +35,14 @@ function navigate(url: string) {
         @click="navigate(bm.url)"
         :title="bm.url"
       >
-        <img
-          v-if="faviconUrl(bm)"
-          :src="faviconUrl(bm)"
-          :alt="bm.name"
-          class="favicon"
-          @load="onIconLoad(bm, $event)"
-          @error="onIconError(bm, $event)"
-        />
-        <span v-else class="favicon-fallback">{{
-          siteName(bm).charAt(0).toUpperCase()
-        }}</span>
-        <span class="bm-name">{{ siteName(bm) }}</span>
+        <FaviconImage :bookmark="bm" :alt="bm.name" image-class="favicon">
+          <template #fallback>
+            <span class="favicon-fallback">{{
+              displayBookmarkName(bm).charAt(0).toUpperCase()
+            }}</span>
+          </template>
+        </FaviconImage>
+        <span class="bm-name">{{ displayBookmarkName(bm) }}</span>
       </button>
       <div v-if="bookmarks.length === 0" class="empty-state">
         No bookmarks yet. Add some in settings.

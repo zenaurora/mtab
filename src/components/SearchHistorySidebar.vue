@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { stripWwwHostname } from '../utils/url'
 
 type ChromeSearchItem = {
   id: string
@@ -28,7 +29,7 @@ const filteredItems = computed(() => {
 function parseSearchUrl(url: string): Omit<ChromeSearchItem, 'id' | 'lastVisitTime'> | null {
   try {
     const parsed = new URL(url)
-    const host = parsed.hostname.replace(/^www\./, '')
+    const host = stripWwwHostname(parsed.hostname)
     const params = parsed.searchParams
 
     const rules: Array<{ match: RegExp; param: string; engineName: string }> = [

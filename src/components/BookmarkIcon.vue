@@ -1,79 +1,26 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import type { Bookmark } from '../types'
-import { displayBookmarkName, faviconCandidates } from '../utils/bookmarkIcon'
-import { shouldRejectLoadedFavicon } from '../utils/faviconValidation'
+import { displayBookmarkName } from '../utils/bookmarkIcon'
+import FaviconImage from './FaviconImage.vue'
 
 const props = defineProps<{
   bookmark: Bookmark
   imgStyle: CSSProperties
-  failed: boolean
 }>()
-
-const emit = defineEmits<{
-  load: []
-  error: []
-}>()
-
-function displayName(bm: Bookmark): string {
-  return displayBookmarkName(bm)
-}
-
-const candidateIndex = ref(0)
-
-const iconSrc = computed(() => {
-  const candidates = faviconCandidates(props.bookmark)
-  return candidates[candidateIndex.value] ?? ''
-})
-
-watch(
-  () => [props.bookmark.url, props.bookmark.iconUrl],
-  () => {
-    candidateIndex.value = 0
-  },
-  { immediate: true }
-)
-
-function advanceOrFail() {
-  const candidates = faviconCandidates(props.bookmark)
-  if (candidateIndex.value < candidates.length - 1) {
-    candidateIndex.value += 1
-    return
-  }
-  emit('error')
-}
-
-function onImgError() {
-  advanceOrFail()
-}
-
-function onImgLoad(event: Event) {
-  const img = event.target as HTMLImageElement
-  // shouldRejectLoadedFavicon already trusts data URL icons as-is.
-  if (shouldRejectLoadedFavicon(img)) {
-    advanceOrFail()
-    return
-  }
-  emit('load')
-}
 </script>
 
 <template>
   <div class="icon-img-wrap" :style="imgStyle">
-    <span v-if="failed || !iconSrc" class="icon-fallback">
-      {{ displayName(bookmark).charAt(0).toUpperCase() }}
-    </span>
-    <img
-      v-else
-      :src="iconSrc"
-      :alt="bookmark.name"
-      class="icon-img"
-      @load="onImgLoad"
-      @error="onImgError"
-    />
+    <FaviconImage :bookmark="bookmark" :alt="bookmark.name" image-class="icon-img">
+      <template #fallback>
+        <span class="icon-fallback">
+          {{ displayBookmarkName(bookmark).charAt(0).toUpperCase() }}
+        </span>
+      </template>
+    </FaviconImage>
   </div>
-  <span class="icon-label">{{ displayName(bookmark) }}</span>
+  <span class="icon-label">{{ displayBookmarkName(bookmark) }}</span>
 </template>
 
 <style>

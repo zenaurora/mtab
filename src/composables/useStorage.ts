@@ -24,6 +24,7 @@ export function useStorage<T>(
   const ready = ref(false)
   let savePromise: Promise<void> | null = null
   let needsSave = false
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
 
   async function load() {
     try {
@@ -94,6 +95,10 @@ export function useStorage<T>(
   }
 
   function save(): Promise<void> {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
     needsSave = true
     savePromise ??= flushSaveQueue().finally(() => {
       savePromise = null
@@ -102,7 +107,6 @@ export function useStorage<T>(
   }
 
   // Auto-save on change with debounce
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
   watch(
     data,
     () => {
@@ -151,18 +155,6 @@ export async function loadStorageValue<T>(key: string): Promise<T | undefined> {
   } catch (e) {
     console.warn(`[useStorage] Failed to load key "${key}":`, e)
     return undefined
-  }
-}
-
-export async function saveStorageValue<T>(key: string, value: T): Promise<void> {
-  try {
-    if (isChromeExtension) {
-      await chrome.storage.local.set({ [key]: value })
-    } else {
-      localStorage.setItem(key, JSON.stringify(value))
-    }
-  } catch (e) {
-    console.warn(`[useStorage] Failed to save key "${key}":`, e)
   }
 }
 

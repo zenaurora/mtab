@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
-import type { WallpaperEntry } from '../../types'
+import { extractDomain } from '../../utils/url'
 
 const store = useSettingsStore()
 
@@ -94,21 +94,13 @@ function applyUrl() {
   store.addToHistory({
     source: url,
     sourceType: 'url',
-    label: extractLabel(url),
+    label: extractDomain(url),
   })
 }
 
 function clearWallpaper() {
   store.clearWallpaper()
   imageUrl.value = ''
-}
-
-function extractLabel(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
 }
 
 // ── Wallhaven.cc resolver ────────────────────────────────────
@@ -178,13 +170,6 @@ function applyWallhavenResult(w: { id: string; path: string; thumbs: { small: st
 // ── History ──────────────────────────────────────────────────
 const history = computed(() => store.data.wallpaperHistory)
 
-function applyHistory(entry: WallpaperEntry) {
-  store.applyFromHistory(entry)
-}
-
-function removeHistory(id: string) {
-  store.removeFromHistory(id)
-}
 </script>
 
 <template>
@@ -200,11 +185,11 @@ function removeHistory(id: string) {
           :key="h.id"
           class="history-row"
         >
-          <span class="history-name" @click="applyHistory(h)" :title="h.label">
+          <span class="history-name" @click="store.applyFromHistory(h)" :title="h.label">
             {{ h.label }}
           </span>
           <span class="history-type">{{ h.sourceType }}</span>
-          <button class="danger mini" @click="removeHistory(h.id)" title="Remove">×</button>
+          <button class="danger mini" @click="store.removeFromHistory(h.id)" title="Remove">×</button>
         </div>
       </div>
     </div>

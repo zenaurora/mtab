@@ -1,7 +1,7 @@
 {
   "name": "mtab",
   "private": true,
-  "version": "1.1.7",
+  "version": "1.1.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,6 @@
     "pack:extension": "npm run build && mkdir -p release && cd dist && zip -r ../release/mtab-extension.zip ."
   },
   "dependencies": {
-    "@vueuse/core": "^14.3.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.34"
   },
