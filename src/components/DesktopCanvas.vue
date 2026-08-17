@@ -76,7 +76,7 @@ const draggingBookmark = computed(() =>
 )
 
 const cellSize = computed(() =>
-  Math.max(96, store.data.iconSize + 28)
+  Math.max(64, store.data.iconSize + 24)
 )
 
 const searchWidget = computed(() => store.data.widgets.find((w) => w.type === 'search') ?? null)
@@ -89,7 +89,7 @@ const canvasOffset = computed(() => {
   const defaultStartX = 4
   const defaultStartY = 6
   const defaultCols = viewportWidth.value < 900 ? 4 : 8
-  const defaultRows = 2
+  const defaultRows = 3
   const layoutW = defaultCols * cell
   const layoutH = defaultRows * cell
 
@@ -112,9 +112,9 @@ const searchGridRect = computed<{ gridX: number; gridY: number; gridW: number; g
   const gridH = 1
   const bounds = gridBounds(gridW, gridH)
   const gridX = clampNumber(base.minX + Math.floor((totalCols - gridW) / 2), bounds.minX, bounds.maxX)
-  const ratio = store.data.searchBarPosition === 'top' ? 0.1
+  const ratio = store.data.searchBarPosition === 'top' ? 0.08
     : store.data.searchBarPosition === 'bottom' ? 0.75
-      : 0.38
+      : 0.2
   const offsetRows = Math.round(store.data.searchBarOffsetY / cellSize.value)
   const gridY = clampNumber(base.minY + Math.round(ratio * totalRows) + offsetRows, bounds.minY, bounds.maxY)
   return { gridX, gridY, gridW, gridH }
@@ -232,7 +232,9 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
   el.style.height = `${dragH.value || cell}px`
   el.style.transform = `translate3d(${offset.x + pos.gridX * cell}px, ${offset.y + pos.gridY * cell}px, 0)`
   el.style.borderColor = occupied ? 'rgba(239, 68, 68, 0.6)' : 'var(--accent)'
-  el.style.background = occupied ? 'rgba(239, 68, 68, 0.06)' : 'rgba(99, 102, 241, 0.06)'
+  el.style.background = occupied
+    ? 'rgba(239, 68, 68, 0.06)'
+    : 'color-mix(in srgb, var(--accent) 10%, transparent)'
 }
 
 function pointerToGrid(x: number, y: number) {
@@ -729,7 +731,7 @@ onUnmounted(() => {
 .canvas-item {
   pointer-events: auto;
   cursor: grab;
-  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s;
+  transition: transform 0.28s cubic-bezier(0.2, 0.75, 0.25, 1), opacity 0.18s;
 }
 
 .canvas-item:active {
@@ -791,14 +793,21 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   background: transparent;
-  border-radius: 12px;
+  border-radius: 18px;
   position: absolute;
+  padding: 3px 2px;
+  transition: transform 0.28s cubic-bezier(0.2, 0.75, 0.25, 1), opacity 0.18s,
+    background 0.2s ease;
 }
 
 .icon-item:hover {
   background: var(--bg-glass);
+}
+
+.icon-item:hover :deep(.icon-img-wrap) {
+  transform: translateY(-2px) scale(1.025);
 }
 
 .icon-del,
@@ -840,13 +849,14 @@ onUnmounted(() => {
 
 .icon-edit:hover {
   background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .icon-add-img {
-  border: 2px dashed var(--border);
-  background: transparent;
+  border: 1px dashed var(--border);
+  background: var(--icon-surface);
   color: var(--text-secondary);
-  transition: border-color 0.15s, color 0.15s;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 
 .icon-add:hover .icon-add-img {
@@ -861,8 +871,8 @@ onUnmounted(() => {
   left: 0;
   top: 0;
   border: 2px dashed var(--accent);
-  border-radius: 12px;
-  background: rgba(99, 102, 241, 0.06);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   pointer-events: none;
   will-change: transform;
   transition: transform 0.12s ease, border-color 0.15s, background 0.15s;

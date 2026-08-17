@@ -102,6 +102,32 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
           />
         </div>
 
+        <div class="icon-surface-controls">
+          <label class="color-field">
+            <span>Background color</span>
+            <span class="color-control">
+              <input
+                type="color"
+                class="color-input"
+                :value="store.data.iconTileColor"
+                @input="store.setIconTileColor(($event.target as HTMLInputElement).value)"
+              />
+              <code>{{ store.data.iconTileColor }}</code>
+            </span>
+          </label>
+
+          <div class="field">
+            <label>Background opacity: {{ store.data.iconTileOpacity }}%</label>
+            <input
+              type="range" min="0" max="100" step="1"
+              :value="store.data.iconTileOpacity"
+              @input="store.setIconTileOpacity(Number(($event.target as HTMLInputElement).value))"
+              class="slider"
+            />
+            <span class="field-hint">Set to 0% for fully transparent icons.</span>
+          </div>
+        </div>
+
         <h4 style="margin-top: 20px">Performance</h4>
         <label class="toggle-row">
           <input
@@ -185,14 +211,14 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
 <style scoped>
 .settings-panel {
   position: fixed;
-  right: 16px;
-  top: 16px;
-  bottom: 16px;
-  width: 360px;
+  right: 18px;
+  top: 18px;
+  bottom: 18px;
+  width: min(388px, calc(100vw - 36px));
   z-index: 50;
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 20px;
   overflow: hidden;
 }
 
@@ -200,13 +226,14 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .panel-header h3 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 
@@ -218,28 +245,28 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
 .tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-shrink: 0;
   overflow-x: auto;
 }
 
 .tab-btn {
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  border-radius: 8px;
   white-space: nowrap;
   background: var(--bg-glass);
 }
 
 .tab-btn.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .tab-content {
   flex: 1;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 6px;
 }
 
 /* Widgets tab */
@@ -251,8 +278,10 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
 }
 
 h4 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.025em;
   margin: 0;
 }
 
@@ -408,6 +437,52 @@ h4 {
 .field label {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.icon-surface-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-glass);
+}
+
+.color-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.color-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-control code {
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+
+.color-input {
+  width: 34px;
+  height: 28px;
+  padding: 3px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.field-hint {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1.45;
+  opacity: 0.72;
 }
 
 .slider {

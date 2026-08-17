@@ -6,7 +6,7 @@ import DesktopCanvas from './components/DesktopCanvas.vue'
 import BrowserBookmarkBar from './components/BrowserBookmarkBar.vue'
 import SearchHistorySidebar from './components/SearchHistorySidebar.vue'
 import SettingsPanel from './components/settings/SettingsPanel.vue'
-import { themeClassFor } from './themes'
+import { THEMES, themeClassFor } from './themes'
 
 const store = useSettingsStore()
 const showSettings = ref(false)
@@ -30,12 +30,39 @@ function onWindowKeydown(e: KeyboardEvent) {
 
 // Compute the active theme class
 const themeClass = computed(() => themeClassFor(store.data.theme))
+const themeClasses = THEMES.map((theme) => theme.className).filter(Boolean)
+
+function iconTileForeground(color: string, opacity: number): string {
+  if (opacity < 45) return 'var(--text-primary)'
+  const value = color.slice(1)
+  const red = Number.parseInt(value.slice(0, 2), 16)
+  const green = Number.parseInt(value.slice(2, 4), 16)
+  const blue = Number.parseInt(value.slice(4, 6), 16)
+  const luminance = (red * 299 + green * 587 + blue * 114) / 255000
+  return luminance > 0.58 ? '#302d27' : '#f4f2ec'
+}
 
 // Apply theme + dark/light class to html element
 watch(
   [() => store.data.darkMode, () => store.data.theme],
   ([dark]) => {
     document.documentElement.classList.toggle('light', !dark)
+    document.documentElement.classList.remove(...themeClasses)
+    if (themeClass.value) document.documentElement.classList.add(themeClass.value)
+  },
+  { immediate: true }
+)
+
+// Desktop icon surfaces also live on the root so teleported drag previews use
+// exactly the same appearance as icons on the canvas.
+watch(
+  [() => store.data.iconTileColor, () => store.data.iconTileOpacity],
+  ([color, opacity]) => {
+    const root = document.documentElement
+    root.style.setProperty('--icon-tile-color', color)
+    root.style.setProperty('--icon-tile-opacity', `${opacity}%`)
+    root.style.setProperty('--icon-tile-foreground', iconTileForeground(color, opacity))
+    root.classList.toggle('icon-tile-transparent', opacity === 0)
   },
   { immediate: true }
 )
@@ -103,33 +130,37 @@ watch(
 <style scoped>
 .app-root {
   width: 100%;
-  height: 100%;
+  min-height: 100dvh;
   position: relative;
   --search-bar-bottom: 0px;
 }
 
 .settings-toggle {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  bottom: 22px;
+  right: 22px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: var(--bg-secondary);
-  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
   border: 1px solid var(--border);
   z-index: 40;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s, background 0.2s;
+  color: var(--text-secondary);
+  opacity: 0.76;
+  box-shadow: 0 12px 34px rgba(2, 4, 7, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform var(--transition), background var(--transition), opacity var(--transition),
+    color var(--transition);
 }
 
 .settings-toggle:hover {
   background: var(--bg-glass-hover);
-  transform: scale(1.05);
+  color: var(--text-primary);
+  opacity: 1;
+  transform: translateY(-2px);
 }
 
 .settings-toggle svg.spinning {
@@ -145,6 +176,7 @@ watch(
   position: fixed;
   inset: 0;
   z-index: 45;
+  background: rgba(3, 5, 8, 0.18);
 }
 
 /* Slide transition */
@@ -166,7 +198,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0a14;
+  background: #0b0c0e;
 }
 
 .loading-spinner {

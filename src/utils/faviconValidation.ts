@@ -2,6 +2,7 @@ const MIN_MEANINGFUL_ICON_SIZE = 8
 const BRIGHT_PIXEL_THRESHOLD = 245
 const SATURATION_THRESHOLD = 18
 const BRIGHT_OR_TRANSPARENT_RATIO = 0.9
+const MAX_SAMPLE_DIMENSION = 64
 
 function sampleStep(length: number) {
   return Math.max(1, Math.floor(length / 256))
@@ -19,17 +20,20 @@ export function shouldRejectLoadedFavicon(img: HTMLImageElement): boolean {
   if (!width || !height) return true
   if (Math.max(width, height) < MIN_MEANINGFUL_ICON_SIZE) return true
 
+  const scale = Math.min(1, MAX_SAMPLE_DIMENSION / Math.max(width, height))
+  const sampleWidth = Math.max(1, Math.round(width * scale))
+  const sampleHeight = Math.max(1, Math.round(height * scale))
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
+  canvas.width = sampleWidth
+  canvas.height = sampleHeight
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return false
 
   try {
-    ctx.drawImage(img, 0, 0, width, height)
-    const { data } = ctx.getImageData(0, 0, width, height)
-    const step = sampleStep(width * height)
+    ctx.drawImage(img, 0, 0, sampleWidth, sampleHeight)
+    const { data } = ctx.getImageData(0, 0, sampleWidth, sampleHeight)
+    const step = sampleStep(sampleWidth * sampleHeight)
     let sampled = 0
     let brightOrTransparent = 0
     let saturated = 0
@@ -63,5 +67,9 @@ export function shouldRejectLoadedFavicon(img: HTMLImageElement): boolean {
   } catch {
     // Cross-origin canvas reads can fail; in that case we keep the image.
     return false
+  } finally {
+    // Drop the backing store immediately instead of waiting for a later GC.
+    canvas.width = 0
+    canvas.height = 0
   }
 }

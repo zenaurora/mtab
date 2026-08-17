@@ -80,7 +80,7 @@ function onKeydown(e: KeyboardEvent) {
         v-model="query"
         @keydown="onKeydown"
         class="search-input"
-        :placeholder="`Search with ${activeEngine?.name ?? '...'}...`"
+        placeholder="Search the web"
         spellcheck="false"
         autocomplete="off"
       />
@@ -96,18 +96,67 @@ function onKeydown(e: KeyboardEvent) {
 
 <style scoped>
 .search-widget { width: 100%; height: 100%; display: flex; align-items: center; overflow: visible; }
-.search-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; width: 100%; min-height: 58px; position: relative; overflow: visible; }
-.engine-btn { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--bg-glass); border-radius: var(--radius-sm); white-space: nowrap; flex-shrink: 0; }
-.engine-name { font-size: 13px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 7px 6px 10px;
+  width: 100%;
+  min-height: 54px;
+  position: relative;
+  overflow: visible;
+  border-radius: 19px;
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 18px 54px rgba(2, 4, 7, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.engine-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px 7px 7px;
+  background: transparent;
+  border-radius: 0;
+  border-right: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.engine-btn:hover { background: transparent; color: var(--text-primary); }
+.engine-name { font-size: 12.5px; font-weight: 500; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
 .engine-btn svg:last-child { transition: transform 0.2s; }
 .engine-btn svg.rotated { transform: rotate(180deg); }
-.engine-menu { padding: 4px; z-index: 9999; display: flex; flex-direction: column; gap: 2px; }
-.engine-item { text-align: left; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
-.engine-item.active { background: var(--accent); color: #fff; }
-.search-input { flex: 1; min-width: 0; background: transparent; border: none; font-size: 16px; color: var(--text-primary); outline: none; padding: 8px 4px; }
-.search-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
-.search-btn { padding: 8px 10px; color: #fff; border-radius: var(--radius-sm); flex-shrink: 0; display: flex; align-items: center; }
+.engine-menu { padding: 6px; z-index: 9999; display: flex; flex-direction: column; gap: 2px; border-radius: 14px; }
+.engine-item { text-align: left; padding: 9px 11px; border-radius: 8px; font-size: 12.5px; }
+.engine-item.active { background: var(--accent); color: var(--accent-contrast); }
+.search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  font-size: 15.5px;
+  font-weight: 450;
+  letter-spacing: 0.005em;
+  color: var(--text-primary);
+  outline: none;
+  padding: 8px 5px;
+}
+.search-input::placeholder { color: var(--text-secondary); opacity: 0.68; }
+.search-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--accent);
+  border-radius: 13px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-glass);
+}
+.search-btn:hover { color: var(--accent-contrast); background: var(--accent-hover); }
 .search-widget :deep(button) { pointer-events: auto; }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.15s ease, transform 0.15s ease; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

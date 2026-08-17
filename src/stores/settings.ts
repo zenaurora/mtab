@@ -61,13 +61,24 @@ const DEFAULT_BOOKMARKS: Bookmark[] = [
   { id: 'bm_gemini', name: 'Gemini', url: 'https://gemini.google.com', gridX: 12, gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai', gridX: 13, gridY: 7, gridW: 1, gridH: 1 },
   { id: 'bm_doubao', name: '豆包', url: 'https://www.doubao.com', gridX: 14, gridY: 7, gridW: 1, gridH: 1 },
+
+  { id: 'bm_figma', name: 'Figma', url: 'https://www.figma.com', gridX: 4, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_monkeytype', name: 'Monkeytype', url: 'https://monkeytype.com', gridX: 5, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_zhihu', name: '知乎', url: 'https://www.zhihu.com', gridX: 6, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_wallhaven', name: 'Wallhaven', url: 'https://wallhaven.cc', gridX: 7, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_human_benchmark', name: 'Human Benchmark', url: 'https://humanbenchmark.com', gridX: 8, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_taobao', name: '淘宝', url: 'https://www.taobao.com', gridX: 9, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_jd', name: '京东', url: 'https://www.jd.com', gridX: 10, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_google_scholar', name: 'Google Scholar', url: 'https://scholar.google.com', gridX: 11, gridY: 8, gridW: 1, gridH: 1 },
 ]
 
-const CURRENT_DEFAULT_BOOKMARK_SEED_VERSION = 2
+const CURRENT_DEFAULT_BOOKMARK_SEED_VERSION = 4
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'default',
-  iconSize: 64,
+  iconSize: 52,
+  iconTileColor: '#ffffff',
+  iconTileOpacity: 8,
   wallpaperUrl: '',
   wallpaperBase64: '',
   wallpaperColor: '',
@@ -401,6 +412,14 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.iconSize = Math.max(40, Math.min(96, size))
   }
 
+  function setIconTileColor(color: string) {
+    if (/^#[0-9a-f]{6}$/i.test(color)) data.value.iconTileColor = color.toLowerCase()
+  }
+
+  function setIconTileOpacity(opacity: number) {
+    data.value.iconTileOpacity = Math.max(0, Math.min(100, opacity))
+  }
+
   // ── Export / Import ──────────────────────────────────────
   function exportConfig(): MTabConfig {
     const settings = JSON.parse(JSON.stringify(data.value)) as Settings
@@ -631,6 +650,8 @@ export const useSettingsStore = defineStore('settings', () => {
     toggleDarkMode,
     setPerformanceMode,
     setIconSize,
+    setIconTileColor,
+    setIconTileOpacity,
     // config I/O
     exportConfig,
     importConfig,

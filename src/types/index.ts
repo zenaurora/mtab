@@ -53,6 +53,8 @@ export interface Settings {
 
   // Desktop icons
   iconSize: number      // 40-96 px
+  iconTileColor: string // hex color, e.g. '#ffffff'
+  iconTileOpacity: number // percentage 0-100
 
   // Wallpaper
   wallpaperUrl: string

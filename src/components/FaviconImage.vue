@@ -21,6 +21,7 @@ function onLoad(event: Event) {
     :src="iconSrc"
     :alt="alt"
     :class="imageClass"
+    decoding="async"
     @load="onLoad"
     @error="advanceOrFail"
   />

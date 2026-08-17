@@ -12,6 +12,12 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
 
   if ('theme' in raw) next.theme = expectMember(raw.theme, THEME_IDS, 'theme')
   if ('iconSize' in raw) next.iconSize = expectNumber(raw.iconSize, 'iconSize', 40, 96)
+  if ('iconTileColor' in raw) {
+    next.iconTileColor = expectHexColor(raw.iconTileColor, 'iconTileColor')
+  }
+  if ('iconTileOpacity' in raw) {
+    next.iconTileOpacity = expectNumber(raw.iconTileOpacity, 'iconTileOpacity', 0, 100)
+  }
   if ('blurAmount' in raw) next.blurAmount = expectNumber(raw.blurAmount, 'blurAmount', 0, 30)
   if ('searchBarWidth' in raw) {
     next.searchBarWidth = expectNumber(raw.searchBarWidth, 'searchBarWidth', 20, 80)
@@ -141,6 +147,13 @@ function expectString(value: unknown, label: string, nonEmpty = false): string {
 function expectBoolean(value: unknown, label: string): boolean {
   if (typeof value !== 'boolean') throw new Error(`${label} must be a boolean`)
   return value
+}
+
+function expectHexColor(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !/^#[0-9a-f]{6}$/i.test(value)) {
+    throw new Error(`${label} must be a six-digit hex color`)
+  }
+  return value.toLowerCase()
 }
 
 function expectNumber(value: unknown, label: string, min: number, max: number): number {

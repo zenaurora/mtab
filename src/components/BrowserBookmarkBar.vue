@@ -325,16 +325,15 @@ function recomputeVisibleItems() {
   left: 0;
   right: 0;
   z-index: 30;
-  height: 34px;
+  height: 32px;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 3px 10px;
   overflow: visible;
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .browser-bookmark-content {
@@ -348,17 +347,17 @@ function recomputeVisibleItems() {
 
 .bookmark-item,
 .folder-menu-item {
-  height: 26px;
+  height: 25px;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
   max-width: 180px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--text-primary);
-  font-size: 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -391,7 +390,7 @@ function recomputeVisibleItems() {
   height: 10px;
   border-radius: 2px;
   flex-shrink: 0;
-  background: #fbbf24;
+  background: var(--accent);
   box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.28);
 }
 

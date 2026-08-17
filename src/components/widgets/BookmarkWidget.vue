@@ -108,7 +108,7 @@ function navigate(url: string) {
   height: 32px;
   border-radius: 6px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
   display: flex;
   align-items: center;
   justify-content: center;

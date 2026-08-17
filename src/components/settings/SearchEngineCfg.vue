@@ -227,6 +227,6 @@ label {
 
 .pos-buttons button.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 </style>

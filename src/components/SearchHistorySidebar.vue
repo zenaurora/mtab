@@ -16,6 +16,7 @@ const rootEl = ref<HTMLElement | null>(null)
 const items = ref<ChromeSearchItem[]>([])
 const loading = ref(false)
 const errorText = ref('')
+const historyLoaded = ref(false)
 
 const filteredItems = computed(() => {
   const term = keyword.value.trim().toLowerCase()
@@ -105,6 +106,14 @@ function loadChromeSearchHistory() {
   )
 }
 
+function toggleExpanded() {
+  expanded.value = !expanded.value
+  if (expanded.value && !historyLoaded.value) {
+    historyLoaded.value = true
+    loadChromeSearchHistory()
+  }
+}
+
 function runSearch(item: ChromeSearchItem) {
   window.location.href = item.searchUrl
 }
@@ -137,7 +146,6 @@ function onDocumentPointerDown(e: PointerEvent) {
 }
 
 onMounted(() => {
-  loadChromeSearchHistory()
   window.addEventListener('keydown', onWindowKeydown)
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
 })
@@ -159,7 +167,7 @@ onUnmounted(() => {
       class="history-tab glass-panel"
       :class="{ active: expanded }"
       title="Chrome search history"
-      @click="expanded = !expanded"
+      @click="toggleExpanded"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M12 8v5l3 2" />
@@ -168,7 +176,7 @@ onUnmounted(() => {
       </svg>
     </button>
 
-    <section class="history-panel glass-panel">
+    <section v-if="expanded" class="history-panel glass-panel">
       <div class="history-head">
         <div>
           <h3>History</h3>
@@ -243,6 +251,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transform: translateY(-50%);
   pointer-events: auto;
 }

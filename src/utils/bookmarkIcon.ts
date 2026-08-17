@@ -9,7 +9,6 @@ export function faviconCandidates(bookmark: Pick<BookmarkLike, 'url' | 'iconUrl'
   try {
     const url = new URL(bookmark.url)
     candidates.push(`${url.origin}/favicon.ico`)
-    candidates.push(`${url.origin}/logo.png`)
     candidates.push(`https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`)
   } catch {
     return candidates
