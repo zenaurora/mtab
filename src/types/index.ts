@@ -55,6 +55,7 @@ export interface Settings {
   iconSize: number      // 40-96 px
   iconTileColor: string // hex color, e.g. '#ffffff'
   iconTileOpacity: number // percentage 0-100
+  iconLabelColor: string // empty means follow the active theme
 
   // Wallpaper
   wallpaperUrl: string

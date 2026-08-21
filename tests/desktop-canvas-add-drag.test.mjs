@@ -79,3 +79,21 @@ test('Add icon animates out of the way when another icon is dragged onto it', as
   assert.deepEqual(canvas.previewPositions[bookmark.id], { gridX: 10, gridY: 8 })
   assert.deepEqual(canvas.previewPositions[addButtonId], { gridX: 11, gridY: 8 })
 })
+
+test('global pointer listeners only stay active during a drag interaction', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  const added = []
+  const removed = []
+  window.addEventListener = (type) => added.push(type)
+  window.removeEventListener = (type) => removed.push(type)
+
+  canvas.startDragListeners()
+  canvas.startDragListeners()
+
+  assert.deepEqual(added, ['pointermove', 'pointerup', 'pointercancel'])
+
+  canvas.stopDragListeners()
+  canvas.stopDragListeners()
+
+  assert.deepEqual(removed, ['pointermove', 'pointerup', 'pointercancel'])
+})

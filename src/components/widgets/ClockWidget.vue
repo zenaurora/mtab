@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 const time = ref('')
 const seconds = ref(0)
-let timer: ReturnType<typeof setInterval> | null = null
+let timer: ReturnType<typeof setTimeout> | null = null
 
 function update() {
   const now = new Date()
@@ -14,13 +14,39 @@ function update() {
   seconds.value = now.getSeconds()
 }
 
+function scheduleNextTick() {
+  if (timer) clearTimeout(timer)
+  timer = null
+  if (document.hidden) return
+
+  // Align updates to the next wall-clock second instead of accumulating
+  // setInterval drift while the new-tab page stays open.
+  const delay = 1000 - (Date.now() % 1000) + 10
+  timer = setTimeout(() => {
+    update()
+    scheduleNextTick()
+  }, delay)
+}
+
+function onVisibilityChange() {
+  if (document.hidden) {
+    if (timer) clearTimeout(timer)
+    timer = null
+    return
+  }
+  update()
+  scheduleNextTick()
+}
+
 onMounted(() => {
   update()
-  timer = setInterval(update, 1000)
+  scheduleNextTick()
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  if (timer) clearTimeout(timer)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 

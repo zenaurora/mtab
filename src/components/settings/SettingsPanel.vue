@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import WallpaperPicker from './WallpaperPicker.vue'
 import SearchEngineCfg from './SearchEngineCfg.vue'
@@ -10,6 +10,9 @@ import { ensureHttpUrl } from '../../utils/url'
 
 const store = useSettingsStore()
 const activeTab = ref<'theme' | 'wallpaper' | 'search' | 'widgets' | 'bookmarks' | 'config'>('theme')
+const iconLabelPickerValue = computed(() =>
+  store.data.iconLabelColor || (store.data.darkMode ? '#f1efe9' : '#292722')
+)
 
 const tabs = [
   { id: 'theme' as const, label: 'Theme' },
@@ -83,11 +86,16 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
             :class="{ active: store.data.theme === t.id }"
             @click="store.setTheme(t.id)"
             :title="t.label"
+            :aria-pressed="store.data.theme === t.id"
           >
             <span class="swatch-bg" :style="{ background: t.bg }">
+              <span class="swatch-surface" :style="{ background: t.surface }"></span>
               <span class="swatch-accent" :style="{ background: t.accent }"></span>
             </span>
-            <span class="swatch-label">{{ t.label }}</span>
+            <span class="swatch-copy">
+              <span class="swatch-label">{{ t.label }}</span>
+              <span class="swatch-description">{{ t.description }}</span>
+            </span>
           </button>
         </div>
 
@@ -116,6 +124,30 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
             </span>
           </label>
 
+          <label class="color-field">
+            <span>
+              Icon label color
+              <small>Defaults to the active theme</small>
+            </span>
+            <span class="color-control">
+              <button
+                v-if="store.data.iconLabelColor"
+                type="button"
+                class="auto-color-btn"
+                @click.prevent="store.setIconLabelColor('')"
+              >
+                Auto
+              </button>
+              <input
+                type="color"
+                class="color-input"
+                :value="iconLabelPickerValue"
+                @input="store.setIconLabelColor(($event.target as HTMLInputElement).value)"
+              />
+              <code>{{ store.data.iconLabelColor || 'Auto' }}</code>
+            </span>
+          </label>
+
           <div class="field">
             <label>Background opacity: {{ store.data.iconTileOpacity }}%</label>
             <input
@@ -128,14 +160,19 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
           </div>
         </div>
 
-        <h4 style="margin-top: 20px">Performance</h4>
+        <h4 class="section-heading">Performance</h4>
         <label class="toggle-row">
+          <span class="toggle-copy">
+            <span class="toggle-title">Low effects mode</span>
+            <span class="toggle-description">Reduce blur and motion for better performance.</span>
+          </span>
           <input
+            class="toggle-input"
             type="checkbox"
             :checked="store.data.performanceMode"
             @change="store.setPerformanceMode(($event.target as HTMLInputElement).checked)"
           />
-          <span>Low effects mode</span>
+          <span class="toggle-control" aria-hidden="true"><span></span></span>
         </label>
       </div>
 
@@ -173,8 +210,12 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
       <!-- Bookmarks tab -->
       <div v-else-if="activeTab === 'bookmarks'" class="bookmarks-tab">
         <label class="toggle-row">
-          <input type="checkbox" v-model="store.data.showBrowserBookmarkBar" />
-          <span>Show browser bookmarks bar</span>
+          <span class="toggle-copy">
+            <span class="toggle-title">Show mtab bookmarks bar</span>
+            <span class="toggle-description">Mirror your browser bookmarks at the top of this page.</span>
+          </span>
+          <input class="toggle-input" type="checkbox" v-model="store.data.showBrowserBookmarkBar" />
+          <span class="toggle-control" aria-hidden="true"><span></span></span>
         </label>
         <h4>Add Bookmark</h4>
 	        <div class="bm-form">
@@ -348,13 +389,97 @@ h4 {
 .toggle-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 58px;
+  padding: 11px 12px 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-glass);
   color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
 }
 
-.toggle-row input {
-  width: auto;
+.toggle-row:hover {
+  background: var(--bg-glass-hover);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.toggle-row:active {
+  transform: scale(0.992);
+}
+
+.toggle-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.toggle-title {
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.35;
+}
+
+.toggle-description {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toggle-control {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-secondary) 17%, transparent);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.toggle-control > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 82%, var(--bg-secondary));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+  transition: transform var(--transition), background var(--transition);
+}
+
+.toggle-input:checked + .toggle-control {
+  border-color: color-mix(in srgb, var(--accent) 76%, transparent);
+  background: var(--accent);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.16);
+}
+
+.toggle-input:checked + .toggle-control > span {
+  background: var(--accent-contrast);
+  transform: translateX(16px);
+}
+
+.toggle-input:focus-visible + .toggle-control {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
 }
 
 .bm-label {
@@ -385,47 +510,91 @@ h4 {
 
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .theme-swatch {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  gap: 9px;
+  min-width: 0;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--bg-glass);
-  border: 2px solid transparent;
-  transition: border-color 0.2s;
+  border: 1px solid transparent;
+  text-align: left;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
   cursor: pointer;
 }
 
+.theme-swatch:hover {
+  background: var(--bg-glass-hover);
+  transform: translateY(-1px);
+}
+
 .theme-swatch.active {
-  border-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 72%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-glass));
 }
 
 .swatch-bg {
-  width: 48px;
-  height: 32px;
-  border-radius: 6px;
+  position: relative;
+  width: 50px;
+  height: 38px;
+  border-radius: 8px;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  padding: 4px;
+  padding: 5px;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.swatch-surface {
+  position: absolute;
+  left: 6px;
+  top: 7px;
+  width: 27px;
+  height: 24px;
+  border-radius: 5px;
 }
 
 .swatch-accent {
-  width: 14px;
-  height: 14px;
+  position: relative;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+}
+
+.swatch-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .swatch-label {
-  font-size: 11px;
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swatch-description {
+  font-size: 9.5px;
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-heading {
+  margin-top: 8px;
 }
 
 .field {
@@ -457,6 +626,18 @@ h4 {
   font-size: 12px;
 }
 
+.color-field > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.color-field small {
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  opacity: 0.72;
+}
+
 .color-control {
   display: flex;
   align-items: center;
@@ -476,6 +657,11 @@ h4 {
   padding: 3px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.auto-color-btn {
+  padding: 4px 7px;
+  font-size: 9.5px;
 }
 
 .field-hint {

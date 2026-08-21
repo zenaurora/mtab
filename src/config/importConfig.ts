@@ -18,6 +18,11 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
   if ('iconTileOpacity' in raw) {
     next.iconTileOpacity = expectNumber(raw.iconTileOpacity, 'iconTileOpacity', 0, 100)
   }
+  if ('iconLabelColor' in raw) {
+    next.iconLabelColor = raw.iconLabelColor === ''
+      ? ''
+      : expectHexColor(raw.iconLabelColor, 'iconLabelColor')
+  }
   if ('blurAmount' in raw) next.blurAmount = expectNumber(raw.blurAmount, 'blurAmount', 0, 30)
   if ('searchBarWidth' in raw) {
     next.searchBarWidth = expectNumber(raw.searchBarWidth, 'searchBarWidth', 20, 80)

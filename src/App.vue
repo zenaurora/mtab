@@ -56,12 +56,17 @@ watch(
 // Desktop icon surfaces also live on the root so teleported drag previews use
 // exactly the same appearance as icons on the canvas.
 watch(
-  [() => store.data.iconTileColor, () => store.data.iconTileOpacity],
-  ([color, opacity]) => {
+  [
+    () => store.data.iconTileColor,
+    () => store.data.iconTileOpacity,
+    () => store.data.iconLabelColor,
+  ],
+  ([color, opacity, labelColor]) => {
     const root = document.documentElement
     root.style.setProperty('--icon-tile-color', color)
     root.style.setProperty('--icon-tile-opacity', `${opacity}%`)
     root.style.setProperty('--icon-tile-foreground', iconTileForeground(color, opacity))
+    root.style.setProperty('--icon-label-color', labelColor || 'var(--text-primary)')
     root.classList.toggle('icon-tile-transparent', opacity === 0)
   },
   { immediate: true }

@@ -60,7 +60,7 @@ const props = defineProps<{
 .icon-label {
   font-size: 11.5px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--icon-label-color);
   opacity: 0.88;
   white-space: nowrap;
   overflow: hidden;

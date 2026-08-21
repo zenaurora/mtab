@@ -34,6 +34,8 @@ const dragKind = ref<'widget' | 'icon'>('icon')
 const draggingId = ref<string | null>(null)
 let ghostXRaw = 0
 let ghostYRaw = 0
+let latestPointerClientX = 0
+let latestPointerClientY = 0
 const dragOffsetX = ref(0)
 const dragOffsetY = ref(0)
 const startX = ref(0)
@@ -48,6 +50,7 @@ let rafId = 0
 let justDragged = false
 let lastSnapGridX = -1
 let lastSnapGridY = -1
+let dragListenersActive = false
 const instantMoveIds = ref<Set<string>>(new Set())
 
 type BookmarkPositionPatch = GridPositionPatch
@@ -342,8 +345,25 @@ function beginDrag(event: PointerEvent, options: DragStartOptions) {
   startY.value = event.clientY
   dragSnapshot = buildOccupancySnapshot(options.id)
   lastDropPlan = null
+  startDragListeners()
   element.setPointerCapture(event.pointerId)
   event.preventDefault()
+}
+
+function startDragListeners() {
+  if (dragListenersActive) return
+  dragListenersActive = true
+  window.addEventListener('pointermove', onWindowPointerMove)
+  window.addEventListener('pointerup', onWindowPointerUp)
+  window.addEventListener('pointercancel', onWindowPointerUp)
+}
+
+function stopDragListeners() {
+  if (!dragListenersActive) return
+  dragListenersActive = false
+  window.removeEventListener('pointermove', onWindowPointerMove)
+  window.removeEventListener('pointerup', onWindowPointerUp)
+  window.removeEventListener('pointercancel', onWindowPointerUp)
 }
 
 // ── Widget pointer down ──────────────────────────────────────
@@ -407,13 +427,13 @@ function onPointerMove(e: PointerEvent) {
 
   if (!isDragging.value) return
 
-  const cx = e.clientX
-  const cy = e.clientY
+  latestPointerClientX = e.clientX
+  latestPointerClientY = e.clientY
   if (rafId) return
   rafId = requestAnimationFrame(() => {
     rafId = 0
-    const gx = cx - dragOffsetX.value
-    const gy = cy - dragOffsetY.value
+    const gx = latestPointerClientX - dragOffsetX.value
+    const gy = latestPointerClientY - dragOffsetY.value
     ghostXRaw = gx
     ghostYRaw = gy
     if (ghostEl.value) {
@@ -568,6 +588,7 @@ function resetDrag() {
   lastDropPlan = null
   lastSnapGridX = -1
   lastSnapGridY = -1
+  stopDragListeners()
 }
 
 // ── Add / Edit modal ─────────────────────────────────────────
@@ -624,15 +645,13 @@ watch(
 onMounted(() => {
   updateViewportSize()
   window.addEventListener('resize', updateViewportSize)
-  window.addEventListener('pointermove', onWindowPointerMove)
-  window.addEventListener('pointerup', onWindowPointerUp)
 })
 
 onUnmounted(() => {
   if (layoutClampRaf) cancelAnimationFrame(layoutClampRaf)
+  if (rafId) cancelAnimationFrame(rafId)
   window.removeEventListener('resize', updateViewportSize)
-  window.removeEventListener('pointermove', onWindowPointerMove)
-  window.removeEventListener('pointerup', onWindowPointerUp)
+  stopDragListeners()
 })
 </script>
 

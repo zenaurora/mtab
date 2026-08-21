@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { stripWwwHostname } from '../utils/url'
 
 type ChromeSearchItem = {
@@ -10,6 +10,16 @@ type ChromeSearchItem = {
   lastVisitTime: number
 }
 
+const SEARCH_URL_RULES: ReadonlyArray<{ match: RegExp; param: string; engineName: string }> = [
+  { match: /(^|\.)google\./, param: 'q', engineName: 'Google' },
+  { match: /(^|\.)bing\.com$/, param: 'q', engineName: 'Bing' },
+  { match: /(^|\.)duckduckgo\.com$/, param: 'q', engineName: 'DuckDuckGo' },
+  { match: /(^|\.)baidu\.com$/, param: 'wd', engineName: 'Baidu' },
+  { match: /(^|\.)sogou\.com$/, param: 'query', engineName: 'Sogou' },
+  { match: /(^|\.)so\.com$/, param: 'q', engineName: '360 Search' },
+  { match: /(^|\.)yahoo\.com$/, param: 'p', engineName: 'Yahoo' },
+]
+
 const expanded = ref(false)
 const keyword = ref('')
 const rootEl = ref<HTMLElement | null>(null)
@@ -17,6 +27,7 @@ const items = ref<ChromeSearchItem[]>([])
 const loading = ref(false)
 const errorText = ref('')
 const historyLoaded = ref(false)
+let interactionListenersActive = false
 
 const filteredItems = computed(() => {
   const term = keyword.value.trim().toLowerCase()
@@ -33,17 +44,7 @@ function parseSearchUrl(url: string): Omit<ChromeSearchItem, 'id' | 'lastVisitTi
     const host = stripWwwHostname(parsed.hostname)
     const params = parsed.searchParams
 
-    const rules: Array<{ match: RegExp; param: string; engineName: string }> = [
-      { match: /(^|\.)google\./, param: 'q', engineName: 'Google' },
-      { match: /(^|\.)bing\.com$/, param: 'q', engineName: 'Bing' },
-      { match: /(^|\.)duckduckgo\.com$/, param: 'q', engineName: 'DuckDuckGo' },
-      { match: /(^|\.)baidu\.com$/, param: 'wd', engineName: 'Baidu' },
-      { match: /(^|\.)sogou\.com$/, param: 'query', engineName: 'Sogou' },
-      { match: /(^|\.)so\.com$/, param: 'q', engineName: '360 Search' },
-      { match: /(^|\.)yahoo\.com$/, param: 'p', engineName: 'Yahoo' },
-    ]
-
-    const rule = rules.find((item) => item.match.test(host))
+    const rule = SEARCH_URL_RULES.find((item) => item.match.test(host))
     if (!rule) return null
 
     const query = params.get(rule.param)?.trim()
@@ -145,12 +146,22 @@ function onDocumentPointerDown(e: PointerEvent) {
   }
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onWindowKeydown)
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
-})
+function syncInteractionListeners(active: boolean) {
+  if (active === interactionListenersActive) return
+  interactionListenersActive = active
+  if (active) {
+    window.addEventListener('keydown', onWindowKeydown)
+    document.addEventListener('pointerdown', onDocumentPointerDown, true)
+    return
+  }
+  window.removeEventListener('keydown', onWindowKeydown)
+  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+}
+
+watch(expanded, syncInteractionListeners)
 
 onUnmounted(() => {
+  interactionListenersActive = false
   window.removeEventListener('keydown', onWindowKeydown)
   document.removeEventListener('pointerdown', onDocumentPointerDown, true)
 })

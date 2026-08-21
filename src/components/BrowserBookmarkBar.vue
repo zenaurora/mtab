@@ -14,6 +14,7 @@ const moreMenuOpen = ref(false)
 const primaryItemIds = ref<string[]>([])
 let layoutRaf = 0
 let resizeObserver: ResizeObserver | null = null
+let outsideClickListenerActive = false
 
 const visibleItems = computed(() =>
   bookmarkBar.value.filter((item) => item.title || item.url || item.children?.length)
@@ -30,10 +31,10 @@ const overflowItems = computed(() => {
   const primaryIds = new Set(primaryItemIds.value)
   return visibleItems.value.filter((item) => !primaryIds.has(item.id))
 })
+const menuOpen = computed(() => Boolean(openFolderId.value) || moreMenuOpen.value)
 
 onMounted(() => {
   loadBrowserBookmarks()
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
   resizeObserver = new ResizeObserver(() => {
     scheduleLayout()
   })
@@ -41,7 +42,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+  syncOutsideClickListener(false)
   if (layoutRaf) cancelAnimationFrame(layoutRaf)
   resizeObserver?.disconnect()
 })
@@ -52,6 +53,18 @@ function onDocumentPointerDown(event: PointerEvent) {
     moreMenuOpen.value = false
   }
 }
+
+function syncOutsideClickListener(active: boolean) {
+  if (active === outsideClickListenerActive) return
+  outsideClickListenerActive = active
+  if (active) {
+    document.addEventListener('pointerdown', onDocumentPointerDown, true)
+    return
+  }
+  document.removeEventListener('pointerdown', onDocumentPointerDown, true)
+}
+
+watch(menuOpen, syncOutsideClickListener)
 
 watch(layoutKey, () => {
   primaryItemIds.value = visibleItems.value.map((item) => item.id)

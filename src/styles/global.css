@@ -14,6 +14,7 @@
   --icon-tile-color: #ffffff;
   --icon-tile-opacity: 8%;
   --icon-tile-foreground: var(--text-primary);
+  --icon-label-color: var(--text-primary);
   --icon-surface: color-mix(
     in srgb,
     var(--icon-tile-color) var(--icon-tile-opacity),
@@ -42,26 +43,30 @@
   --bg-glass-hover: rgba(49, 45, 38, 0.1);
   --text-primary: #292722;
   --text-secondary: #706d66;
+  --accent: #8b6b34;
+  --accent-hover: #755725;
+  --accent-contrast: #fffdf8;
+  --border-focus: rgba(139, 107, 52, 0.5);
   --border: rgba(49, 45, 38, 0.11);
   --shadow: 0 20px 54px rgba(79, 67, 48, 0.14);
 }
 
-/* ── Gruvbox Dark ─────────────────────────────────────────── */
-.theme-gruvbox {
-  --bg-primary: rgba(60, 56, 54, 0.88);
-  --bg-secondary: rgba(40, 40, 40, 0.93);
-  --bg-glass: rgba(80, 73, 69, 0.55);
-  --bg-glass-hover: rgba(102, 92, 84, 0.7);
-  --text-primary: #ebdbb2;
-  --text-secondary: #a89984;
-  --accent: #d79921;
-  --accent-hover: #fabd2f;
-  --border: rgba(168, 153, 132, 0.22);
-  --border-focus: rgba(215, 153, 33, 0.65);
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
+/* Theme palettes keep their established identities and add dedicated light variants. */
+.theme-sandstone {
+  --bg-primary: rgba(48, 42, 36, 0.86);
+  --bg-secondary: rgba(33, 29, 25, 0.94);
+  --bg-glass: rgba(210, 188, 160, 0.08);
+  --bg-glass-hover: rgba(210, 188, 160, 0.14);
+  --text-primary: #eee7dc;
+  --text-secondary: #b7aa9a;
+  --accent: #c19265;
+  --accent-hover: #d0a476;
+  --accent-contrast: #25180e;
+  --border: rgba(218, 198, 172, 0.13);
+  --border-focus: rgba(193, 146, 101, 0.58);
+  --shadow: 0 22px 60px rgba(19, 13, 9, 0.42);
 }
 
-/* ── Catppuccin Mocha ─────────────────────────────────────── */
 .theme-catppuccin {
   --bg-primary: rgba(49, 50, 68, 0.88);
   --bg-secondary: rgba(30, 30, 46, 0.93);
@@ -71,12 +76,12 @@
   --text-secondary: #a6adc8;
   --accent: #cba6f7;
   --accent-hover: #d8b4fe;
+  --accent-contrast: #1e1e2e;
   --border: rgba(166, 173, 200, 0.2);
   --border-focus: rgba(203, 166, 247, 0.65);
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
 }
 
-/* ── Everforest Dark ──────────────────────────────────────── */
 .theme-everforest {
   --bg-primary: rgba(55, 66, 71, 0.88);
   --bg-secondary: rgba(43, 51, 57, 0.93);
@@ -86,24 +91,81 @@
   --text-secondary: #9da9a0;
   --accent: #a7c080;
   --accent-hover: #b5ce8c;
+  --accent-contrast: #20251f;
   --border: rgba(157, 169, 160, 0.2);
   --border-focus: rgba(167, 192, 128, 0.65);
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.55);
 }
 
-/* ── Shadcn Dark (high-end black) ─────────────────────────── */
-.theme-shadcn {
-  --bg-primary: rgba(24, 24, 27, 0.92);
-  --bg-secondary: rgba(9, 9, 11, 0.96);
-  --bg-glass: rgba(39, 39, 42, 0.75);
-  --bg-glass-hover: rgba(63, 63, 70, 0.85);
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --accent: #e4e4e7;
-  --accent-hover: #ffffff;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(255, 255, 255, 0.28);
-  --shadow: 0 4px 32px rgba(0, 0, 0, 0.75);
+.theme-slate {
+  --bg-primary: rgba(36, 44, 54, 0.86);
+  --bg-secondary: rgba(23, 29, 36, 0.94);
+  --bg-glass: rgba(192, 207, 220, 0.075);
+  --bg-glass-hover: rgba(192, 207, 220, 0.13);
+  --text-primary: #e9eef2;
+  --text-secondary: #a9b4bd;
+  --accent: #82a8c8;
+  --accent-hover: #96b7d1;
+  --accent-contrast: #101c26;
+  --border: rgba(200, 214, 226, 0.12);
+  --border-focus: rgba(130, 168, 200, 0.58);
+  --shadow: 0 22px 60px rgba(8, 13, 19, 0.46);
+}
+
+.light.theme-sandstone {
+  --bg-primary: rgba(244, 238, 229, 0.8);
+  --bg-secondary: rgba(247, 242, 234, 0.92);
+  --bg-glass: rgba(87, 67, 48, 0.06);
+  --bg-glass-hover: rgba(87, 67, 48, 0.11);
+  --text-primary: #342b24;
+  --text-secondary: #75675a;
+  --accent: #8d603a;
+  --accent-hover: #744a2b;
+  --accent-contrast: #fffaf4;
+  --border: rgba(87, 67, 48, 0.12);
+  --border-focus: rgba(141, 96, 58, 0.48);
+}
+
+.light.theme-catppuccin {
+  --bg-primary: rgba(230, 233, 239, 0.82);
+  --bg-secondary: rgba(239, 241, 245, 0.94);
+  --bg-glass: rgba(76, 79, 105, 0.07);
+  --bg-glass-hover: rgba(76, 79, 105, 0.12);
+  --text-primary: #4c4f69;
+  --text-secondary: #6c6f85;
+  --accent: #8839ef;
+  --accent-hover: #7527d8;
+  --accent-contrast: #ffffff;
+  --border: rgba(76, 79, 105, 0.14);
+  --border-focus: rgba(136, 57, 239, 0.48);
+}
+
+.light.theme-everforest {
+  --bg-primary: rgba(239, 235, 212, 0.82);
+  --bg-secondary: rgba(253, 246, 227, 0.94);
+  --bg-glass: rgba(92, 106, 101, 0.07);
+  --bg-glass-hover: rgba(92, 106, 101, 0.12);
+  --text-primary: #5c6a72;
+  --text-secondary: #829181;
+  --accent: #4f7942;
+  --accent-hover: #3f6834;
+  --accent-contrast: #ffffff;
+  --border: rgba(92, 106, 101, 0.15);
+  --border-focus: rgba(79, 121, 66, 0.48);
+}
+
+.light.theme-slate {
+  --bg-primary: rgba(237, 241, 244, 0.8);
+  --bg-secondary: rgba(243, 246, 248, 0.92);
+  --bg-glass: rgba(42, 63, 80, 0.06);
+  --bg-glass-hover: rgba(42, 63, 80, 0.11);
+  --text-primary: #27323b;
+  --text-secondary: #5f6e79;
+  --accent: #527997;
+  --accent-hover: #3e647f;
+  --accent-contrast: #fbfdff;
+  --border: rgba(42, 63, 80, 0.12);
+  --border-focus: rgba(82, 121, 151, 0.48);
 }
 
 html,

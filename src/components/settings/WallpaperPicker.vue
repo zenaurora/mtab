@@ -7,13 +7,33 @@ const store = useSettingsStore()
 
 const imageUrl = ref(store.data.wallpaperUrl)
 
-// ── Solid color presets ──────────────────────────────────────
-const SOLID_COLORS = [
-  '#0f0c29', '#1a1a2e', '#16213e', '#0d1b2a',
-  '#1b263b', '#2d3436', '#1a1a1a', '#2c3e50',
-  '#1e3a3a', '#2d1b4e', '#3d1f1f', '#1f3d2d',
-  '#3e2723', '#263238', '#000000', '#1a237e',
-]
+// Muted, named presets replace the previous unlabelled collection of dark hex values.
+const COLOR_GROUPS = [
+  {
+    label: 'Low light',
+    description: 'Deep, low-saturation colors for dark mode',
+    colors: [
+      { name: 'Midnight', color: '#0f141c', foreground: '#eaf0f8' },
+      { name: 'Forest', color: '#121815', foreground: '#e8f0eb' },
+      { name: 'Graphite', color: '#151419', foreground: '#f1eef5' },
+      { name: 'Slate', color: '#1b2633', foreground: '#edf2f7' },
+      { name: 'Cocoa', color: '#2b231e', foreground: '#f2e9df' },
+      { name: 'Dusk', color: '#25222b', foreground: '#f0ebf3' },
+    ],
+  },
+  {
+    label: 'Soft light',
+    description: 'Warm and cool off-whites without harsh pure white',
+    colors: [
+      { name: 'Cloud', color: '#f7f9fc', foreground: '#172033' },
+      { name: 'Sage paper', color: '#f3f6f1', foreground: '#1d2a22' },
+      { name: 'Warm paper', color: '#f7f3eb', foreground: '#29261f' },
+      { name: 'Mist', color: '#e7ecef', foreground: '#25313a' },
+      { name: 'Oat', color: '#ebe3d5', foreground: '#302a22' },
+      { name: 'Stone', color: '#e3e2de', foreground: '#292a28' },
+    ],
+  },
+] as const
 
 function applyColor(color: string) {
   store.setWallpaperColor(color)
@@ -216,19 +236,37 @@ const history = computed(() => store.data.wallpaperHistory)
       <input type="file" accept="image/*" @change="onFileChange" class="file-input" />
     </div>
 
-    <!-- Solid color presets -->
-    <div class="field">
-      <label>Solid Color</label>
-      <div class="color-grid">
-        <button
-          v-for="c in SOLID_COLORS"
-          :key="c"
-          class="color-swatch"
-          :class="{ active: store.data.wallpaperColor === c }"
-          :style="{ background: c }"
-          @click="applyColor(c)"
-          :title="c"
-        ></button>
+    <!-- Curated solid color presets -->
+    <div class="field color-presets">
+      <label>Solid color presets</label>
+      <p class="field-hint">A smaller set of muted colors for focused or low-light use.</p>
+      <div v-for="group in COLOR_GROUPS" :key="group.label" class="color-group">
+        <div class="color-group-heading">
+          <span>{{ group.label }}</span>
+          <small>{{ group.description }}</small>
+        </div>
+        <div class="color-grid">
+          <button
+            v-for="preset in group.colors"
+            :key="preset.color"
+            class="color-swatch"
+            :class="{ active: store.data.wallpaperColor === preset.color }"
+            @click="applyColor(preset.color)"
+            :title="`${preset.name} · ${preset.color}`"
+            :aria-label="`Use ${preset.name} wallpaper`"
+            :aria-pressed="store.data.wallpaperColor === preset.color"
+          >
+            <span
+              class="color-preview"
+              :style="{ background: preset.color, color: preset.foreground }"
+            >
+              <svg v-if="store.data.wallpaperColor === preset.color" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <path d="m5 12 4 4L19 6" />
+              </svg>
+            </span>
+            <span class="color-name">{{ preset.name }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -306,6 +344,13 @@ label {
   color: var(--text-secondary);
 }
 
+.field-hint {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1.45;
+  opacity: 0.78;
+}
+
 .row {
   display: flex;
   gap: 6px;
@@ -376,30 +421,88 @@ label {
   flex-shrink: 0;
 }
 
-/* Solid color swatches */
+/* Curated solid color swatches */
+.color-presets {
+  gap: 9px;
+}
+
+.color-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-glass);
+}
+
+.color-group-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.color-group-heading > span {
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 550;
+}
+
+.color-group-heading small {
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
 .color-grid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
 }
 
 .color-swatch {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
   width: 100%;
-  aspect-ratio: 1;
-  border-radius: 6px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
   cursor: pointer;
-  padding: 0;
-  border: 2px solid transparent;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color var(--transition), background var(--transition), transform var(--transition);
 }
 
 .color-swatch:hover {
-  transform: scale(1.15);
+  background: var(--bg-glass-hover);
+  transform: translateY(-1px);
 }
 
 .color-swatch.active {
-  border-color: var(--accent);
-  transform: scale(1.1);
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.color-preview {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.18);
+}
+
+.color-name {
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Wallhaven search grid */

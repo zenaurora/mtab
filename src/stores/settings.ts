@@ -79,6 +79,7 @@ const DEFAULT_SETTINGS: Settings = {
   iconSize: 52,
   iconTileColor: '#ffffff',
   iconTileOpacity: 8,
+  iconLabelColor: '',
   wallpaperUrl: '',
   wallpaperBase64: '',
   wallpaperColor: '',
@@ -420,6 +421,12 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.iconTileOpacity = Math.max(0, Math.min(100, opacity))
   }
 
+  function setIconLabelColor(color: string) {
+    if (color === '' || /^#[0-9a-f]{6}$/i.test(color)) {
+      data.value.iconLabelColor = color.toLowerCase()
+    }
+  }
+
   // ── Export / Import ──────────────────────────────────────
   function exportConfig(): MTabConfig {
     const settings = JSON.parse(JSON.stringify(data.value)) as Settings
@@ -486,6 +493,10 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   function normalizeSettingsShape() {
+    if (typeof data.value.iconLabelColor !== 'string' ||
+      (data.value.iconLabelColor !== '' && !/^#[0-9a-f]{6}$/i.test(data.value.iconLabelColor))) {
+      data.value.iconLabelColor = ''
+    }
     if (!Array.isArray(data.value.searchEngines) || data.value.searchEngines.length === 0) {
       data.value.searchEngines = [...DEFAULT_ENGINES]
     }
@@ -652,6 +663,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setIconSize,
     setIconTileColor,
     setIconTileOpacity,
+    setIconLabelColor,
     // config I/O
     exportConfig,
     importConfig,
