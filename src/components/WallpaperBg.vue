@@ -14,10 +14,7 @@ const bgStyle = computed(() => {
   // Image wallpaper — prefer blob URL for local images (avoids base64 in JS heap)
   const src = store.wallpaperBlobUrl || store.data.wallpaperUrl
   if (!src) {
-    return {
-      background:
-        'radial-gradient(ellipse at 16% 12%, rgba(126, 101, 65, 0.2) 0%, transparent 42%), radial-gradient(ellipse at 84% 78%, rgba(54, 78, 82, 0.16) 0%, transparent 46%), linear-gradient(145deg, #17181a 0%, #0b0c0e 72%)',
-    }
+    return { background: 'var(--wallpaper-background)' }
   }
   return {
     backgroundImage: `url(${src})`,
@@ -51,7 +48,7 @@ const bgStyle = computed(() => {
   position: fixed;
   inset: 0;
   z-index: 1;
-  background: rgba(4, 5, 7, 0.12);
+  background: transparent;
   pointer-events: none;
 }
 
@@ -60,7 +57,7 @@ const bgStyle = computed(() => {
 }
 
 .wallpaper-overlay.light {
-  background: rgba(248, 246, 240, 0.12);
+  background: transparent;
 }
 
 .wallpaper-overlay.light.with-image {

@@ -21,7 +21,7 @@
 
 ```ts
 const cellSize = computed(() =>
-  Math.max(96, store.data.iconSize + 28)
+  Math.max(64, store.data.iconSize + 24)
 )
 ```
 
@@ -98,7 +98,7 @@ transform: `translate3d(${offset.x + pos.gridX * cell}px, ${offset.y + pos.gridY
 
 换句话说，用户拖的是一个视觉块，系统判断的是“这个块的重心更接近哪一格”。
 
-同时，`clampGridPosition()` 会把结果限制在当前视口允许的网格范围内。[DesktopCanvas.vue](/Users/mkh/code1/mtab/src/components/DesktopCanvas.vue:124)
+同时，组件和图标使用两套边界：组件由 `clampGridPosition()` 限制在视口内，桌面快捷图标和 Add 图标由 `clampIconGridPosition()` 限制在用户设置的水平活动范围内。
 
 这意味着两件事：
 
@@ -106,6 +106,12 @@ transform: `translate3d(${offset.x + pos.gridX * cell}px, ${offset.y + pos.gridY
 - 即使窗口尺寸变化，已有布局也能被重新夹回可见区域
 
 后者是由 `clampCurrentLayoutToViewport()` 在窗口变化后做的。[DesktopCanvas.vue](/Users/mkh/code1/mtab/src/components/DesktopCanvas.vue:595)
+
+图标活动范围分成两层。外层虚线框是像素范围：先从屏幕两侧保留相同的基础留白，再在剩余宽度内应用左右百分比，所以左右都为 0% 时框与屏幕两侧的距离必然相同。内层才是网格范围：只选择完全落在框内的单元格。因此图标尺寸变化时，实际可用列数会变化，但不会反过来让外框产生一个图标宽度的偏移。
+
+桌面网格原点仍服务于默认图标组的居中布局，所以框靠近屏幕左侧时，内部合法列可能出现负数 `gridX`。负数只表示“位于居中网格原点左边”，不是图标跑出屏幕；书签和 Add 图标的保存、导入与拖拽都支持这种坐标。
+
+搜索框和 widget 也会占用格子。如果用户请求的范围放不下当前全部快捷图标，范围计算模块会用最少的列数向外扩展，并同步扩大虚线框；只要整个视口本身还有足够容量，图标就会保持唯一位置。左右边距是首选范围，而“不重叠”是更高优先级的不变量。若小视口、大图标和大量内容让整个视口都没有足够格子，横向范围已经无法解决，需要另行采用分页、滚动或响应式缩放策略。
 
 所以“自动网格对齐”并不是放手那一瞬间才做，而是从拖动预览开始，到最终落点提交，再到窗口变化后的布局修正，整条链路都在坚持网格坐标。
 

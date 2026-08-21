@@ -30,7 +30,7 @@ export interface Bookmark {
   name: string
   url: string
   iconUrl?: string
-  gridX: number   // column index (0-based)
+  gridX: number   // signed column index on the centered desktop grid
   gridY: number   // row index (0-based)
 }
 
@@ -54,6 +54,10 @@ export interface Settings {
   iconTileColor: string // hex color, e.g. '#ffffff'
   iconTileOpacity: number // percentage 0-100
   iconLabelColor: string // empty means follow the active theme
+  iconArea: {
+    leftPercent: number  // horizontal inset from the left edge, 0-40%
+    rightPercent: number // horizontal inset from the right edge, 0-40%
+  }
 
   // Wallpaper
   wallpaperUrl: string

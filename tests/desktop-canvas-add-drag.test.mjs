@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createSSRApp } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
@@ -125,4 +126,100 @@ test('layout reconciliation moves widgets away from the responsive search bar', 
     moved.gridY < search.gridY + search.gridH &&
     moved.gridY + moved.gridH > search.gridY
   assert.equal(overlapsSearch, false)
+})
+
+test('icon positions are clamped inside the configured horizontal activity area', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  canvas.store.data.iconArea.leftPercent = 20
+  canvas.store.data.iconArea.rightPercent = 25
+
+  const bounds = canvas.iconGridBounds.value
+  assert.ok(bounds.minX > canvas.gridBounds(1, 1).minX)
+  assert.ok(bounds.maxX < canvas.gridBounds(1, 1).maxX)
+
+  assert.deepEqual(
+    canvas.clampIconGridPosition(bounds.minX - 10, 8),
+    { gridX: bounds.minX, gridY: 8 },
+  )
+  assert.deepEqual(
+    canvas.clampIconGridPosition(bounds.maxX + 10, 8),
+    { gridX: bounds.maxX, gridY: 8 },
+  )
+})
+
+test('the visible icon-area frame uses symmetric screen-edge padding at zero insets', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  canvas.store.data.iconArea.leftPercent = 0
+  canvas.store.data.iconArea.rightPercent = 0
+
+  const style = canvas.iconAreaGuideStyle.value
+  const [, translatedX] = /translate3d\(([-\d.]+)px,/.exec(style.transform)
+  const left = Number(translatedX)
+  const right = window.innerWidth - left - Number.parseFloat(style.width)
+
+  assert.equal(left, 24)
+  assert.equal(right, 24)
+})
+
+test('an over-constrained icon area expands just enough to keep every icon in a unique cell', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  canvas.store.data.iconArea.leftPercent = 40
+  canvas.store.data.iconArea.rightPercent = 40
+
+  const requested = canvas.iconAreaLayout.value.requestedGridBounds
+  const effective = canvas.iconGridBounds.value
+  assert.ok(
+    effective.minX < requested.minX || effective.maxX > requested.maxX,
+    'the effective range should expand when the requested range has too few cells',
+  )
+
+  canvas.clampCurrentLayoutToViewport()
+
+  const positions = [
+    ...canvas.store.data.bookmarks.map(({ gridX, gridY }) => ({ gridX, gridY })),
+    {
+      gridX: canvas.store.data.addButtonGridX,
+      gridY: canvas.store.data.addButtonGridY,
+    },
+  ]
+  const keys = positions.map(({ gridX, gridY }) => `${gridX},${gridY}`)
+  assert.equal(new Set(keys).size, keys.length)
+  assert.equal(
+    positions.every(({ gridX, gridY }) =>
+      gridX >= effective.minX &&
+      gridX <= effective.maxX &&
+      gridY >= effective.minY &&
+      gridY <= effective.maxY,
+    ),
+    true,
+  )
+})
+
+test('drag plans use the effective icon area at both horizontal edges', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  canvas.store.data.iconArea.leftPercent = 20
+  canvas.store.data.iconArea.rightPercent = 20
+  const bookmark = canvas.store.data.bookmarks[0]
+  canvas.dragStartGridX.value = bookmark.gridX
+  canvas.dragStartGridY.value = bookmark.gridY
+
+  const leftPlan = canvas.planIconDrop(bookmark.id, -100, bookmark.gridY)
+  const rightPlan = canvas.planIconDrop(bookmark.id, 100, bookmark.gridY)
+
+  assert.equal(leftPlan.patches.at(-1).gridX, canvas.iconGridBounds.value.minX)
+  assert.equal(rightPlan.patches.at(-1).gridX, canvas.iconGridBounds.value.maxX)
+})
+
+test('the icon-area guide renders above settings without intercepting input', async () => {
+  const source = await readFile(
+    new URL('../src/components/DesktopCanvas.vue', import.meta.url),
+    'utf8',
+  )
+  const teleportedGuide = /<Teleport to="body">\s*<div\s+v-if="showIconAreaGuide"\s+class="icon-area-guide"/.test(source)
+  const guideRule = /\.icon-area-guide\s*{([^}]*)}/.exec(source)?.[1] ?? ''
+
+  assert.equal(teleportedGuide, true)
+  assert.match(guideRule, /position:\s*fixed/)
+  assert.match(guideRule, /z-index:\s*60/)
+  assert.match(guideRule, /pointer-events:\s*none/)
 })

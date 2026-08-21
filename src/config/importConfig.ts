@@ -1,5 +1,6 @@
 import type { Bookmark, SearchEngine, Settings, Widget, WidgetType } from '../types'
 import { THEME_IDS } from '../themes'
+import { ICON_AREA_MAX_INSET_PERCENT } from '../layout/iconArea'
 
 const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks'])
 const SEARCH_POSITIONS = new Set<Settings['searchBar']['verticalPosition']>(['top', 'center', 'bottom'])
@@ -21,6 +22,23 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
     next.iconLabelColor = raw.iconLabelColor === ''
       ? ''
       : expectHexColor(raw.iconLabelColor, 'iconLabelColor')
+  }
+  if ('iconArea' in raw) {
+    const iconArea = expectRecord(raw.iconArea, 'iconArea')
+    next.iconArea = {
+      leftPercent: expectNumber(
+        iconArea.leftPercent,
+        'iconArea.leftPercent',
+        0,
+        ICON_AREA_MAX_INSET_PERCENT,
+      ),
+      rightPercent: expectNumber(
+        iconArea.rightPercent,
+        'iconArea.rightPercent',
+        0,
+        ICON_AREA_MAX_INSET_PERCENT,
+      ),
+    }
   }
   if ('blurAmount' in raw) next.blurAmount = expectNumber(raw.blurAmount, 'blurAmount', 0, 30)
   if ('searchBar' in raw) {
@@ -50,7 +68,7 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
     next.showAddButton = expectBoolean(raw.showAddButton, 'showAddButton')
   }
   if ('addButtonGridX' in raw) {
-    next.addButtonGridX = expectInteger(raw.addButtonGridX, 'addButtonGridX', 0)
+    next.addButtonGridX = expectInteger(raw.addButtonGridX, 'addButtonGridX')
   }
   if ('addButtonGridY' in raw) {
     next.addButtonGridY = expectInteger(raw.addButtonGridY, 'addButtonGridY', 0)
@@ -112,7 +130,7 @@ function parseBookmarks(value: unknown): Bookmark[] {
       id: expectString(bookmark.id, `bookmarks[${index}].id`, true),
       name: expectString(bookmark.name, `bookmarks[${index}].name`),
       url: expectString(bookmark.url, `bookmarks[${index}].url`, true),
-      gridX: expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`, 0),
+      gridX: expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`),
       gridY: expectInteger(bookmark.gridY, `bookmarks[${index}].gridY`, 0),
     }
     if (bookmark.iconUrl !== undefined) {
@@ -157,9 +175,13 @@ function expectNumber(value: unknown, label: string, min: number, max: number): 
   return value
 }
 
-function expectInteger(value: unknown, label: string, min: number): number {
-  if (!Number.isInteger(value) || (value as number) < min) {
-    throw new Error(`${label} must be an integer greater than or equal to ${min}`)
+function expectInteger(value: unknown, label: string, min?: number): number {
+  if (!Number.isInteger(value) || (min !== undefined && (value as number) < min)) {
+    throw new Error(
+      min === undefined
+        ? `${label} must be an integer`
+        : `${label} must be an integer greater than or equal to ${min}`,
+    )
   }
   return value as number
 }

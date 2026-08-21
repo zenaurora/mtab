@@ -17,13 +17,16 @@ import {
   planMovableDrop,
   resolveGridPatches,
   type DropPlan,
+  type GridBounds,
   type GridPositionPatch,
   type GridRect,
   type GridSnapshot,
   type MovableGridItem,
 } from '../layout/gridLayout'
+import { calculateIconAreaLayout } from '../layout/iconArea'
 
 const store = useSettingsStore()
+defineProps<{ showIconAreaGuide?: boolean }>()
 
 const DRAG_THRESHOLD = 6
 const ADD_BTN_ID = '__add_btn__'
@@ -83,11 +86,19 @@ const cellSize = computed(() =>
   Math.max(64, store.data.iconSize + 24)
 )
 
+const canvasInsets = computed(() => {
+  const horizontal = viewportWidth.value < 720 ? 12 : 24
+  const topReserved = store.data.showBrowserBookmarkBar ? 42 : 12
+  const vertical = viewportHeight.value < 640 ? 10 : 24
+  return {
+    horizontal,
+    top: Math.max(topReserved, vertical),
+    bottom: vertical,
+  }
+})
+
 const canvasOffset = computed(() => {
   const cell = cellSize.value
-  const paddingX = viewportWidth.value < 720 ? 12 : 24
-  const topReserved = store.data.showBrowserBookmarkBar ? 42 : 12
-  const paddingY = Math.max(topReserved, viewportHeight.value < 640 ? 10 : 24)
   const defaultStartX = 4
   const defaultStartY = 6
   const defaultCols = viewportWidth.value < 900 ? 4 : 8
@@ -96,8 +107,12 @@ const canvasOffset = computed(() => {
   const layoutH = defaultRows * cell
 
   return {
-    x: Math.max(paddingX, Math.floor((viewportWidth.value - layoutW) / 2)) - defaultStartX * cell,
-    y: Math.max(paddingY, Math.floor((viewportHeight.value - layoutH) / 2)) - defaultStartY * cell,
+    x:
+      Math.max(canvasInsets.value.horizontal, Math.floor((viewportWidth.value - layoutW) / 2)) -
+      defaultStartX * cell,
+    y:
+      Math.max(canvasInsets.value.top, Math.floor((viewportHeight.value - layoutH) / 2)) -
+      defaultStartY * cell,
   }
 })
 
@@ -145,6 +160,26 @@ function gridBounds(gridW = 1, gridH = 1) {
   return { minX, minY, maxX, maxY }
 }
 
+const iconAreaLayout = computed(() => calculateIconAreaLayout({
+  viewport: {
+    width: viewportWidth.value,
+    height: viewportHeight.value,
+    horizontalPadding: canvasInsets.value.horizontal,
+    topPadding: canvasInsets.value.top,
+    bottomPadding: canvasInsets.value.bottom,
+  },
+  grid: {
+    cellSize: cellSize.value,
+    offsetX: canvasOffset.value.x,
+    offsetY: canvasOffset.value.y,
+  },
+  insets: store.data.iconArea,
+  requiredCells: store.data.bookmarks.length + (store.data.showAddButton ? 1 : 0),
+  blockers: [searchGridRect.value, ...store.data.widgets],
+}))
+
+const iconGridBounds = computed<GridBounds>(() => iconAreaLayout.value.gridBounds)
+
 function clampGridPosition(gridX: number, gridY: number, gridW = 1, gridH = 1) {
   const bounds = gridBounds(gridW, gridH)
   return {
@@ -153,23 +188,53 @@ function clampGridPosition(gridX: number, gridY: number, gridW = 1, gridH = 1) {
   }
 }
 
-function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
+function clampIconGridPosition(gridX: number, gridY: number) {
+  const bounds = iconGridBounds.value
+  return {
+    gridX: clampNumber(gridX, bounds.minX, bounds.maxX),
+    gridY: clampNumber(gridY, bounds.minY, bounds.maxY),
+  }
+}
+
+function positionedGridStyle(
+  gridX: number,
+  gridY: number,
+  gridW: number,
+  gridH: number,
+) {
   const cell = cellSize.value
   const offset = canvasOffset.value
-  const pos = clampGridPosition(gridX, gridY, gridW, gridH)
   return {
     position: 'absolute' as const,
     left: '0',
     top: '0',
     width: `${gridW * cell}px`,
     height: `${gridH * cell}px`,
-    transform: `translate3d(${offset.x + pos.gridX * cell}px, ${offset.y + pos.gridY * cell}px, 0)`,
+    transform: `translate3d(${offset.x + gridX * cell}px, ${offset.y + gridY * cell}px, 0)`,
   }
+}
+
+const iconAreaGuideStyle = computed(() => {
+  const frame = iconAreaLayout.value.frame
+  return {
+    position: 'fixed' as const,
+    left: '0',
+    top: '0',
+    width: `${frame.width}px`,
+    height: `${frame.height}px`,
+    transform: `translate3d(${frame.left}px, ${frame.top}px, 0)`,
+  }
+})
+
+function gridStyle(gridX: number, gridY: number, gridW = 1, gridH = 1) {
+  const pos = clampGridPosition(gridX, gridY, gridW, gridH)
+  return positionedGridStyle(pos.gridX, pos.gridY, gridW, gridH)
 }
 
 function iconGridStyle(id: string, gridX: number, gridY: number) {
   const preview = previewPositions[id]
-  return gridStyle(preview?.gridX ?? gridX, preview?.gridY ?? gridY)
+  const pos = clampIconGridPosition(preview?.gridX ?? gridX, preview?.gridY ?? gridY)
+  return positionedGridStyle(pos.gridX, pos.gridY, 1, 1)
 }
 
 function itemClass(id: string) {
@@ -227,7 +292,9 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
   const offset = canvasOffset.value
   const gridW = Math.max(1, Math.ceil((dragW.value || cell) / cell))
   const gridH = Math.max(1, Math.ceil((dragH.value || cell) / cell))
-  const pos = clampGridPosition(col, row, gridW, gridH)
+  const pos = dragKind.value === 'icon'
+    ? clampIconGridPosition(col, row)
+    : clampGridPosition(col, row, gridW, gridH)
 
   el.style.width = `${dragW.value || cell}px`
   el.style.height = `${dragH.value || cell}px`
@@ -243,12 +310,11 @@ function pointerToGrid(x: number, y: number) {
   const offset = canvasOffset.value
   const gridW = Math.max(1, Math.ceil((dragW.value || cell) / cell))
   const gridH = Math.max(1, Math.ceil((dragH.value || cell) / cell))
-  return clampGridPosition(
-    Math.round((x - offset.x + dragW.value / 2 - cell / 2) / cell),
-    Math.round((y - offset.y + dragH.value / 2 - cell / 2) / cell),
-    gridW,
-    gridH,
-  )
+  const gridX = Math.round((x - offset.x + dragW.value / 2 - cell / 2) / cell)
+  const gridY = Math.round((y - offset.y + dragH.value / 2 - cell / 2) / cell)
+  return dragKind.value === 'icon'
+    ? clampIconGridPosition(gridX, gridY)
+    : clampGridPosition(gridX, gridY, gridW, gridH)
 }
 
 let layoutClampRaf = 0
@@ -278,7 +344,7 @@ function clampCurrentLayoutToViewport() {
     }
   }
 
-  const iconBounds = gridBounds(1, 1)
+  const iconBounds = iconGridBounds.value
 
   const patches: BookmarkPositionPatch[] = []
   for (const bm of store.data.bookmarks) {
@@ -489,7 +555,7 @@ function planIconDrop(id: string, rawX: number, rawY: number, baseSnapshot = dra
     { gridX: rawX, gridY: rawY },
     { gridX: dragStartGridX.value, gridY: dragStartGridY.value },
     baseSnapshot ?? buildOccupancySnapshot(id, true),
-    gridBounds(1, 1),
+    iconGridBounds.value,
   )
 }
 
@@ -516,7 +582,7 @@ function resolvePatchCollisions(patches: BookmarkPositionPatch[]) {
     })
   }
   const blockerRects: GridRect[] = [searchGridRect.value, ...store.data.widgets]
-  return resolveGridPatches(patches, movableItems, blockerRects, gridBounds(1, 1))
+  return resolveGridPatches(patches, movableItems, blockerRects, iconGridBounds.value)
 }
 
 function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
@@ -624,6 +690,8 @@ watch(
     store.data.searchBar.verticalPosition,
     store.data.searchBar.offsetY,
     store.data.iconSize,
+    store.data.iconArea.leftPercent,
+    store.data.iconArea.rightPercent,
   ],
   () => scheduleLayoutClamp(),
 )
@@ -717,6 +785,15 @@ onUnmounted(() => {
     <div v-if="isDragging" ref="dropIndicatorEl" class="drop-indicator" />
   </div>
 
+  <Teleport to="body">
+    <div
+      v-if="showIconAreaGuide"
+      class="icon-area-guide"
+      :style="iconAreaGuideStyle"
+      aria-hidden="true"
+    ></div>
+  </Teleport>
+
   <!-- ── Drag ghost (teleported to body) ────────────────────── -->
   <Teleport to="body">
     <div v-if="isDragging" ref="ghostEl" class="canvas-ghost" :style="{ width: `${dragW}px`, height: `${dragH}px` }">
@@ -753,6 +830,15 @@ onUnmounted(() => {
   z-index: 8;
   pointer-events: none;
   user-select: none;
+}
+
+.icon-area-guide {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  border: 1px dashed color-mix(in srgb, var(--accent) 68%, transparent);
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .canvas-item {

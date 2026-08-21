@@ -86,7 +86,7 @@ watch(
     <BrowserBookmarkBar />
 
     <!-- Desktop canvas: widgets + icons on a free grid -->
-    <DesktopCanvas />
+    <DesktopCanvas :show-icon-area-guide="showSettings" />
 
     <!-- Chrome search history -->
     <SearchHistorySidebar />

@@ -9,6 +9,7 @@ import {
   type MovableGridItem,
 } from '../layout/gridLayout'
 import { parseImportedConfig } from '../config/importConfig'
+import { clampIconAreaInset, ICON_AREA_MAX_INSET_PERCENT } from '../layout/iconArea'
 import type {
   Settings,
   SearchEngine,
@@ -76,6 +77,10 @@ const DEFAULT_SETTINGS: Settings = {
   iconTileColor: '#ffffff',
   iconTileOpacity: 8,
   iconLabelColor: '',
+  iconArea: {
+    leftPercent: 0,
+    rightPercent: 0,
+  },
   wallpaperUrl: '',
   wallpaperColor: '',
   wallpaperHistory: [],
@@ -109,7 +114,7 @@ const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
 }
 const WIDGET_TYPES = new Set(Object.keys(WIDGET_SIZES))
 
-function decodeSettings(value: unknown): Settings | undefined {
+function decodeSettings(value: unknown, onMigration: () => void): Settings | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const settings = value as Record<string, unknown>
   const searchBar = settings.searchBar
@@ -134,6 +139,31 @@ function decodeSettings(value: unknown): Settings | undefined {
   ) {
     return undefined
   }
+
+  // Settings saved before icon-area controls existed remain valid and receive
+  // the non-restrictive default. New payloads are validated at the same seam.
+  const iconArea = settings.iconArea
+  if (iconArea === undefined) {
+    onMigration()
+    return {
+      ...(value as Settings),
+      iconArea: { ...DEFAULT_SETTINGS.iconArea },
+    }
+  }
+  if (!iconArea || typeof iconArea !== 'object' || Array.isArray(iconArea)) return undefined
+  const area = iconArea as Record<string, unknown>
+  if (
+    typeof area.leftPercent !== 'number' ||
+    !Number.isFinite(area.leftPercent) ||
+    area.leftPercent < 0 ||
+    area.leftPercent > ICON_AREA_MAX_INSET_PERCENT ||
+    typeof area.rightPercent !== 'number' ||
+    !Number.isFinite(area.rightPercent) ||
+    area.rightPercent < 0 ||
+    area.rightPercent > ICON_AREA_MAX_INSET_PERCENT
+  ) {
+    return undefined
+  }
   return value as Settings
 }
 
@@ -143,7 +173,14 @@ function genId(prefix = 'id'): string {
 }
 
 export const useSettingsStore = defineStore('settings', () => {
-  const { data, load, save } = useStorage<Settings>(SETTINGS_KEY, DEFAULT_SETTINGS, decodeSettings)
+  let shouldPersistDecodedSettings = false
+  const { data, load, save } = useStorage<Settings>(
+    SETTINGS_KEY,
+    DEFAULT_SETTINGS,
+    (value) => decodeSettings(value, () => {
+      shouldPersistDecodedSettings = true
+    }),
+  )
 
   // Blob URL for local wallpaper. It is recreated from IndexedDB on load and
   // never persisted in the JSON settings payload.
@@ -319,13 +356,13 @@ export const useSettingsStore = defineStore('settings', () => {
     for (const patch of patches) {
       const bm = byId.get(patch.id)
       if (!bm) continue
-      bm.gridX = Math.max(0, patch.gridX)
+      bm.gridX = patch.gridX
       bm.gridY = Math.max(0, patch.gridY)
     }
   }
 
   function moveAddButton(gridX: number, gridY: number) {
-    data.value.addButtonGridX = Math.max(0, gridX)
+    data.value.addButtonGridX = gridX
     data.value.addButtonGridY = Math.max(0, gridY)
   }
 
@@ -385,6 +422,14 @@ export const useSettingsStore = defineStore('settings', () => {
     data.value.iconSize = Math.max(40, Math.min(96, size))
   }
 
+  function setIconAreaLeft(percent: number) {
+    data.value.iconArea.leftPercent = clampIconAreaInset(percent)
+  }
+
+  function setIconAreaRight(percent: number) {
+    data.value.iconArea.rightPercent = clampIconAreaInset(percent)
+  }
+
   function setIconTileColor(color: string) {
     if (/^#[0-9a-f]{6}$/i.test(color)) data.value.iconTileColor = color.toLowerCase()
   }
@@ -438,6 +483,10 @@ export const useSettingsStore = defineStore('settings', () => {
     wallpaperBlobUrl,
     async load() {
       await load()
+      if (shouldPersistDecodedSettings) {
+        shouldPersistDecodedSettings = false
+        await save()
+      }
       const localWallpaper = await loadStoredWallpaperBlob()
       if (localWallpaper && !data.value.wallpaperUrl && !data.value.wallpaperColor) {
         wallpaperBlobUrl.value = createWallpaperBlobUrl(localWallpaper)
@@ -480,6 +529,8 @@ export const useSettingsStore = defineStore('settings', () => {
     toggleDarkMode,
     setPerformanceMode,
     setIconSize,
+    setIconAreaLeft,
+    setIconAreaRight,
     setIconTileColor,
     setIconTileOpacity,
     setIconLabelColor,

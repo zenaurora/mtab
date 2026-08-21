@@ -40,6 +40,10 @@ test('settings use the current canonical schema only', async () => {
       verticalPosition: 'center',
       offsetY: 0,
     })
+    assert.deepEqual(JSON.parse(writtenSettings).iconArea, {
+      leftPercent: 0,
+      rightPercent: 0,
+    })
     assert.equal('version' in config, false)
     assert.deepEqual(config.settings.searchBar, {
       widthPercent: 50,
@@ -59,8 +63,55 @@ test('settings use the current canonical schema only', async () => {
 
     const updated = structuredClone(config)
     updated.settings.searchBar.widthPercent = 65
+    updated.settings.iconArea = { leftPercent: 12, rightPercent: 18 }
+    updated.settings.bookmarks[0].gridX = -1
+    updated.settings.addButtonGridX = -2
     store.importConfig(updated)
     assert.equal(store.data.searchBar.widthPercent, 65)
+    assert.deepEqual(store.data.iconArea, { leftPercent: 12, rightPercent: 18 })
+    assert.equal(store.data.bookmarks[0].gridX, -1)
+    assert.equal(store.data.addButtonGridX, -2)
+  } finally {
+    await server.close()
+  }
+})
+
+test('valid settings from before icon-area controls are migrated and persisted', async () => {
+  setActivePinia(createPinia())
+  let storedValue = null
+  globalThis.localStorage = {
+    getItem() {
+      return storedValue
+    },
+    setItem(_key, value) {
+      storedValue = value
+    },
+    removeItem() {},
+  }
+  const server = await createServer({
+    appType: 'custom',
+    server: { hmr: false, middlewareMode: true, ws: false },
+  })
+
+  try {
+    const { useSettingsStore } = await server.ssrLoadModule('/src/stores/settings.ts')
+    const seedStore = useSettingsStore()
+    const legacySettings = seedStore.exportConfig().settings
+    delete legacySettings.iconArea
+    storedValue = JSON.stringify(legacySettings)
+
+    setActivePinia(createPinia())
+    const migratedStore = useSettingsStore()
+    const originalWarn = console.warn
+    console.warn = () => {}
+    try {
+      await migratedStore.load()
+    } finally {
+      console.warn = originalWarn
+    }
+
+    assert.deepEqual(migratedStore.data.iconArea, { leftPercent: 0, rightPercent: 0 })
+    assert.deepEqual(JSON.parse(storedValue).iconArea, { leftPercent: 0, rightPercent: 0 })
   } finally {
     await server.close()
   }

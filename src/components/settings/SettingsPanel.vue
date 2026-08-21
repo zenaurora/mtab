@@ -7,6 +7,7 @@ import ConfigIO from './ConfigIO.vue'
 import type { WidgetType } from '../../types'
 import { THEMES } from '../../themes'
 import { ensureHttpUrl } from '../../utils/url'
+import { ICON_AREA_MAX_INSET_PERCENT } from '../../layout/iconArea'
 
 const store = useSettingsStore()
 const tabs = [
@@ -109,6 +110,45 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
             @input="store.setIconSize(Number(($event.target as HTMLInputElement).value))"
             class="slider"
           />
+        </div>
+
+        <h4 class="section-heading">Icon Movement Area</h4>
+        <div class="icon-area-controls">
+          <div class="icon-area-preview" aria-hidden="true">
+            <span
+              class="icon-area-inset"
+              :style="{ width: `${store.data.iconArea.leftPercent}%` }"
+            ></span>
+            <span class="icon-area-active"></span>
+            <span
+              class="icon-area-inset"
+              :style="{ width: `${store.data.iconArea.rightPercent}%` }"
+            ></span>
+          </div>
+
+          <div class="field">
+            <label>Left margin: {{ store.data.iconArea.leftPercent }}%</label>
+            <input
+              type="range" min="0" :max="ICON_AREA_MAX_INSET_PERCENT" step="1"
+              :value="store.data.iconArea.leftPercent"
+              @input="store.setIconAreaLeft(Number(($event.target as HTMLInputElement).value))"
+              class="slider"
+            />
+          </div>
+
+          <div class="field">
+            <label>Right margin: {{ store.data.iconArea.rightPercent }}%</label>
+            <input
+              type="range" min="0" :max="ICON_AREA_MAX_INSET_PERCENT" step="1"
+              :value="store.data.iconArea.rightPercent"
+              @input="store.setIconAreaRight(Number(($event.target as HTMLInputElement).value))"
+              class="slider"
+            />
+          </div>
+
+          <span class="field-hint">
+            The frame follows these margins; icons snap to complete grid cells inside it. When needed, it expands only enough to prevent overlaps.
+          </span>
         </div>
 
         <div class="icon-surface-controls">
@@ -619,6 +659,37 @@ h4 {
   padding: 12px;
   border-radius: 12px;
   background: var(--bg-glass);
+}
+
+.icon-area-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-glass);
+}
+
+.icon-area-preview {
+  display: flex;
+  width: 100%;
+  height: 22px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
+}
+
+.icon-area-inset {
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--text-secondary) 15%, transparent);
+}
+
+.icon-area-active {
+  flex: 1 1 auto;
+  min-width: 0;
+  border-inline: 1px solid color-mix(in srgb, var(--accent) 68%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .color-field {
