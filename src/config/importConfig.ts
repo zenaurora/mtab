@@ -1,12 +1,11 @@
 import type { Bookmark, SearchEngine, Settings, Widget, WidgetType } from '../types'
 import { THEME_IDS } from '../themes'
 
-const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks', 'search'])
-const SEARCH_POSITIONS = new Set<Settings['searchBarPosition']>(['top', 'center', 'bottom'])
+const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks'])
+const SEARCH_POSITIONS = new Set<Settings['searchBar']['verticalPosition']>(['top', 'center', 'bottom'])
 
 export function parseImportedConfig(input: unknown, current: Settings): Settings {
   const config = expectRecord(input, 'Config')
-  if (config.version !== 1) throw new Error('Unsupported mtab config version')
   const raw = expectRecord(config.settings, 'Config settings')
   const next = cloneSettings(current)
 
@@ -24,14 +23,17 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
       : expectHexColor(raw.iconLabelColor, 'iconLabelColor')
   }
   if ('blurAmount' in raw) next.blurAmount = expectNumber(raw.blurAmount, 'blurAmount', 0, 30)
-  if ('searchBarWidth' in raw) {
-    next.searchBarWidth = expectNumber(raw.searchBarWidth, 'searchBarWidth', 20, 80)
-  }
-  if ('searchBarPosition' in raw) {
-    next.searchBarPosition = expectMember(raw.searchBarPosition, SEARCH_POSITIONS, 'searchBarPosition')
-  }
-  if ('searchBarOffsetY' in raw) {
-    next.searchBarOffsetY = expectNumber(raw.searchBarOffsetY, 'searchBarOffsetY', -200, 200)
+  if ('searchBar' in raw) {
+    const searchBar = expectRecord(raw.searchBar, 'searchBar')
+    next.searchBar = {
+      widthPercent: expectNumber(searchBar.widthPercent, 'searchBar.widthPercent', 20, 80),
+      verticalPosition: expectMember(
+        searchBar.verticalPosition,
+        SEARCH_POSITIONS,
+        'searchBar.verticalPosition',
+      ),
+      offsetY: expectNumber(searchBar.offsetY, 'searchBar.offsetY', -200, 200),
+    }
   }
   if ('activeEngineId' in raw) next.activeEngineId = expectString(raw.activeEngineId, 'activeEngineId')
   if ('searchEngines' in raw) next.searchEngines = parseSearchEngines(raw.searchEngines)
@@ -41,13 +43,6 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
   }
   if ('widgets' in raw) next.widgets = parseWidgets(raw.widgets)
   if ('bookmarks' in raw) next.bookmarks = parseBookmarks(raw.bookmarks)
-  if ('defaultBookmarkSeedVersion' in raw) {
-    next.defaultBookmarkSeedVersion = expectInteger(
-      raw.defaultBookmarkSeedVersion,
-      'defaultBookmarkSeedVersion',
-      0,
-    )
-  }
   if ('showBrowserBookmarkBar' in raw) {
     next.showBrowserBookmarkBar = expectBoolean(raw.showBrowserBookmarkBar, 'showBrowserBookmarkBar')
   }
@@ -117,18 +112,12 @@ function parseBookmarks(value: unknown): Bookmark[] {
       id: expectString(bookmark.id, `bookmarks[${index}].id`, true),
       name: expectString(bookmark.name, `bookmarks[${index}].name`),
       url: expectString(bookmark.url, `bookmarks[${index}].url`, true),
+      gridX: expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`, 0),
+      gridY: expectInteger(bookmark.gridY, `bookmarks[${index}].gridY`, 0),
     }
     if (bookmark.iconUrl !== undefined) {
       parsed.iconUrl = expectString(bookmark.iconUrl, `bookmarks[${index}].iconUrl`)
     }
-    if (bookmark.gridX !== undefined) {
-      parsed.gridX = expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`, 0)
-    }
-    if (bookmark.gridY !== undefined) {
-      parsed.gridY = expectInteger(bookmark.gridY, `bookmarks[${index}].gridY`, 0)
-    }
-    parsed.gridW = 1
-    parsed.gridH = 1
     return parsed
   })
   assertUniqueIds(bookmarks, 'bookmarks')

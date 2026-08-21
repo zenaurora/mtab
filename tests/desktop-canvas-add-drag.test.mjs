@@ -16,6 +16,11 @@ async function loadDesktopCanvasSetup() {
     return 1
   }
   globalThis.cancelAnimationFrame = () => {}
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+  }
 
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -96,4 +101,28 @@ test('global pointer listeners only stay active during a drag interaction', asyn
   canvas.stopDragListeners()
 
   assert.deepEqual(removed, ['pointermove', 'pointerup', 'pointercancel'])
+})
+
+test('layout reconciliation moves widgets away from the responsive search bar', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  const search = canvas.searchGridRect.value
+  const widget = {
+    id: 'widget_clock',
+    type: 'clock',
+    gridX: search.gridX,
+    gridY: search.gridY,
+    gridW: 2,
+    gridH: 2,
+  }
+  canvas.store.data.widgets = [widget]
+
+  canvas.clampCurrentLayoutToViewport()
+
+  const moved = canvas.store.data.widgets[0]
+  const overlapsSearch =
+    moved.gridX < search.gridX + search.gridW &&
+    moved.gridX + moved.gridW > search.gridX &&
+    moved.gridY < search.gridY + search.gridH &&
+    moved.gridY + moved.gridH > search.gridY
+  assert.equal(overlapsSearch, false)
 })

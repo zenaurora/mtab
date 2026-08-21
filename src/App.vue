@@ -77,7 +77,7 @@ watch(
   <div
     v-if="loaded"
     class="app-root"
-    :class="[{ light: !store.data.darkMode, 'performance-mode': store.data.performanceMode }, themeClass]"
+    :class="{ 'performance-mode': store.data.performanceMode }"
   >
     <!-- Background -->
     <WallpaperBg />
@@ -137,7 +137,6 @@ watch(
   width: 100%;
   min-height: 100dvh;
   position: relative;
-  --search-bar-bottom: 0px;
 }
 
 .settings-toggle {

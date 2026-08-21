@@ -77,13 +77,13 @@ function removeEngine(id: string) {
     <h4 style="margin-top: 16px">Search Bar</h4>
 
     <div class="field">
-      <label>Width: {{ store.data.searchBarWidth }}%</label>
+      <label>Width: {{ store.data.searchBar.widthPercent }}%</label>
       <input
         type="range"
         min="20"
         max="80"
         step="5"
-        :value="store.data.searchBarWidth"
+        :value="store.data.searchBar.widthPercent"
         @input="
           store.setSearchBarWidth(
             Number(($event.target as HTMLInputElement).value)
@@ -99,7 +99,7 @@ function removeEngine(id: string) {
         <button
           v-for="pos in (['top', 'center', 'bottom'] as const)"
           :key="pos"
-          :class="{ active: store.data.searchBarPosition === pos }"
+          :class="{ active: store.data.searchBar.verticalPosition === pos }"
           @click="store.setSearchBarPosition(pos)"
         >
           {{ pos }}
@@ -108,13 +108,13 @@ function removeEngine(id: string) {
     </div>
 
     <div class="field">
-      <label>Vertical offset: {{ store.data.searchBarOffsetY }}px</label>
+      <label>Vertical offset: {{ store.data.searchBar.offsetY }}px</label>
       <input
         type="range"
         min="-200"
         max="200"
         step="10"
-        :value="store.data.searchBarOffsetY"
+        :value="store.data.searchBar.offsetY"
         @input="
           store.setSearchBarOffsetY(
             Number(($event.target as HTMLInputElement).value)

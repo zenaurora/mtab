@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import { displayBookmarkName } from '../../utils/bookmarkIcon'
 import FaviconImage from '../FaviconImage.vue'
 
 const store = useSettingsStore()
-const bookmarks = computed(() => store.data.bookmarks)
 
 function navigate(url: string) {
   window.location.href = url
@@ -29,7 +27,7 @@ function navigate(url: string) {
     </div>
     <div class="bookmark-grid">
       <button
-        v-for="bm in bookmarks"
+        v-for="bm in store.data.bookmarks"
         :key="bm.id"
         class="bookmark-item"
         @click="navigate(bm.url)"
@@ -44,7 +42,7 @@ function navigate(url: string) {
         </FaviconImage>
         <span class="bm-name">{{ displayBookmarkName(bm) }}</span>
       </button>
-      <div v-if="bookmarks.length === 0" class="empty-state">
+      <div v-if="store.data.bookmarks.length === 0" class="empty-state">
         No bookmarks yet. Add some in settings.
       </div>
     </div>

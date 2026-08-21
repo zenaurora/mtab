@@ -11,7 +11,7 @@ export interface SearchEngine {
 }
 
 // Widget types
-export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks' | 'search'
+export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks'
 
 export interface Widget {
   id: string
@@ -30,18 +30,16 @@ export interface Bookmark {
   name: string
   url: string
   iconUrl?: string
-  gridX?: number   // column index (0-based)
-  gridY?: number   // row index (0-based)
-  gridW?: number   // always 1
-  gridH?: number   // always 1
+  gridX: number   // column index (0-based)
+  gridY: number   // row index (0-based)
 }
 
 // Wallpaper history entry
 export interface WallpaperEntry {
   id: string
-  // Source: the actual wallpaper (base64 full or URL)
+  // Local entries point to the single Blob stored in IndexedDB.
   source: string
-  sourceType: 'url' | 'base64' | 'wallhaven'
+  sourceType: 'url' | 'local' | 'wallhaven'
   label: string  // display label
   addedAt: string // ISO date
 }
@@ -59,15 +57,16 @@ export interface Settings {
 
   // Wallpaper
   wallpaperUrl: string
-  wallpaperBase64: string
   wallpaperColor: string  // hex solid color, e.g. '#1a1a2e'
   wallpaperHistory: WallpaperEntry[]
   blurAmount: number // 0-30 px
 
   // Search bar
-  searchBarWidth: number // percentage 20-80
-  searchBarPosition: 'top' | 'center' | 'bottom'
-  searchBarOffsetY: number // fine-tune vertical offset in px
+  searchBar: {
+    widthPercent: number // percentage 20-80
+    verticalPosition: 'top' | 'center' | 'bottom'
+    offsetY: number // fine-tune vertical offset in px
+  }
   activeEngineId: string
   searchEngines: SearchEngine[]
 
@@ -80,7 +79,6 @@ export interface Settings {
 
   // Bookmarks
   bookmarks: Bookmark[]
-  defaultBookmarkSeedVersion: number
 
   // Chrome bookmarks bar mirror
   showBrowserBookmarkBar: boolean
@@ -96,7 +94,6 @@ export interface Settings {
 
 // Export/import config structure
 export interface MTabConfig {
-  version: number
   exportedAt: string
   settings: Settings
 }

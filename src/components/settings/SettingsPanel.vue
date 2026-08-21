@@ -9,11 +9,6 @@ import { THEMES } from '../../themes'
 import { ensureHttpUrl } from '../../utils/url'
 
 const store = useSettingsStore()
-const activeTab = ref<'theme' | 'wallpaper' | 'search' | 'widgets' | 'bookmarks' | 'config'>('theme')
-const iconLabelPickerValue = computed(() =>
-  store.data.iconLabelColor || (store.data.darkMode ? '#f1efe9' : '#292722')
-)
-
 const tabs = [
   { id: 'theme' as const, label: 'Theme' },
   { id: 'wallpaper' as const, label: 'Wallpaper' },
@@ -22,6 +17,12 @@ const tabs = [
   { id: 'bookmarks' as const, label: 'Bookmarks' },
   { id: 'config' as const, label: 'Config' },
 ]
+type SettingsTab = (typeof tabs)[number]['id']
+
+const activeTab = ref<SettingsTab>('theme')
+const iconLabelPickerValue = computed(() =>
+  store.data.iconLabelColor || (store.data.darkMode ? '#f1efe9' : '#292722')
+)
 
 // Bookmark form
 const bmName = ref('')
@@ -88,9 +89,9 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
             :title="t.label"
             :aria-pressed="store.data.theme === t.id"
           >
-            <span class="swatch-bg" :style="{ background: t.bg }">
-              <span class="swatch-surface" :style="{ background: t.surface }"></span>
-              <span class="swatch-accent" :style="{ background: t.accent }"></span>
+            <span class="swatch-bg" :class="[t.className, { light: !store.data.darkMode }]">
+              <span class="swatch-surface"></span>
+              <span class="swatch-accent"></span>
             </span>
             <span class="swatch-copy">
               <span class="swatch-label">{{ t.label }}</span>
@@ -549,6 +550,7 @@ h4 {
   justify-content: flex-end;
   padding: 5px;
   overflow: hidden;
+  background: var(--bg-secondary);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
@@ -559,6 +561,7 @@ h4 {
   width: 27px;
   height: 24px;
   border-radius: 5px;
+  background: var(--bg-glass-hover);
 }
 
 .swatch-accent {
@@ -566,6 +569,7 @@ h4 {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+  background: var(--accent);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
 }
 

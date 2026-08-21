@@ -6,8 +6,8 @@
   padding: 0;
 }
 
-:root {
-  --bg-primary: rgba(25, 26, 28, 0.72);
+:root,
+.theme-graphite {
   --bg-secondary: rgba(18, 19, 21, 0.82);
   --bg-glass: rgba(255, 255, 255, 0.055);
   --bg-glass-hover: rgba(255, 255, 255, 0.095);
@@ -30,14 +30,12 @@
   --shadow: 0 22px 60px rgba(3, 5, 8, 0.38);
   --radius: 18px;
   --radius-sm: 9px;
-  --radius-lg: 24px;
   --transition: 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI',
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
 .light {
-  --bg-primary: rgba(248, 246, 240, 0.78);
   --bg-secondary: rgba(248, 246, 240, 0.9);
   --bg-glass: rgba(49, 45, 38, 0.055);
   --bg-glass-hover: rgba(49, 45, 38, 0.1);
@@ -53,7 +51,6 @@
 
 /* Theme palettes keep their established identities and add dedicated light variants. */
 .theme-sandstone {
-  --bg-primary: rgba(48, 42, 36, 0.86);
   --bg-secondary: rgba(33, 29, 25, 0.94);
   --bg-glass: rgba(210, 188, 160, 0.08);
   --bg-glass-hover: rgba(210, 188, 160, 0.14);
@@ -68,7 +65,6 @@
 }
 
 .theme-catppuccin {
-  --bg-primary: rgba(49, 50, 68, 0.88);
   --bg-secondary: rgba(30, 30, 46, 0.93);
   --bg-glass: rgba(69, 71, 90, 0.55);
   --bg-glass-hover: rgba(88, 91, 112, 0.7);
@@ -83,7 +79,6 @@
 }
 
 .theme-everforest {
-  --bg-primary: rgba(55, 66, 71, 0.88);
   --bg-secondary: rgba(43, 51, 57, 0.93);
   --bg-glass: rgba(65, 75, 80, 0.55);
   --bg-glass-hover: rgba(82, 94, 100, 0.7);
@@ -98,7 +93,6 @@
 }
 
 .theme-slate {
-  --bg-primary: rgba(36, 44, 54, 0.86);
   --bg-secondary: rgba(23, 29, 36, 0.94);
   --bg-glass: rgba(192, 207, 220, 0.075);
   --bg-glass-hover: rgba(192, 207, 220, 0.13);
@@ -113,7 +107,6 @@
 }
 
 .light.theme-sandstone {
-  --bg-primary: rgba(244, 238, 229, 0.8);
   --bg-secondary: rgba(247, 242, 234, 0.92);
   --bg-glass: rgba(87, 67, 48, 0.06);
   --bg-glass-hover: rgba(87, 67, 48, 0.11);
@@ -127,7 +120,6 @@
 }
 
 .light.theme-catppuccin {
-  --bg-primary: rgba(230, 233, 239, 0.82);
   --bg-secondary: rgba(239, 241, 245, 0.94);
   --bg-glass: rgba(76, 79, 105, 0.07);
   --bg-glass-hover: rgba(76, 79, 105, 0.12);
@@ -141,7 +133,6 @@
 }
 
 .light.theme-everforest {
-  --bg-primary: rgba(239, 235, 212, 0.82);
   --bg-secondary: rgba(253, 246, 227, 0.94);
   --bg-glass: rgba(92, 106, 101, 0.07);
   --bg-glass-hover: rgba(92, 106, 101, 0.12);
@@ -155,7 +146,6 @@
 }
 
 .light.theme-slate {
-  --bg-primary: rgba(237, 241, 244, 0.8);
   --bg-secondary: rgba(243, 246, 248, 0.92);
   --bg-glass: rgba(42, 63, 80, 0.06);
   --bg-glass-hover: rgba(42, 63, 80, 0.11);

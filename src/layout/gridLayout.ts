@@ -1,11 +1,11 @@
-export type CellKey = `${number},${number}`
+type CellKey = `${number},${number}`
 
-export type GridPosition = {
+type GridPosition = {
   gridX: number
   gridY: number
 }
 
-export type GridSize = {
+type GridSize = {
   gridW: number
   gridH: number
 }
@@ -37,7 +37,7 @@ export type DropPlan = {
   occupied: boolean
 }
 
-export function cellKey(gridX: number, gridY: number): CellKey {
+function cellKey(gridX: number, gridY: number): CellKey {
   return `${gridX},${gridY}`
 }
 
@@ -59,7 +59,7 @@ export function createGridSnapshot(
   return snapshot
 }
 
-export function cloneGridSnapshot(snapshot: GridSnapshot): GridSnapshot {
+function cloneGridSnapshot(snapshot: GridSnapshot): GridSnapshot {
   return {
     movable: new Map(snapshot.movable),
     blocked: new Set(snapshot.blocked),
@@ -78,12 +78,12 @@ export function occupyBlocker(snapshot: GridSnapshot, rect: GridRect): void {
   }
 }
 
-export function isGridCellOccupied(snapshot: GridSnapshot, gridX: number, gridY: number): boolean {
+function isGridCellOccupied(snapshot: GridSnapshot, gridX: number, gridY: number): boolean {
   const key = cellKey(gridX, gridY)
   return snapshot.movable.has(key) || snapshot.blocked.has(key)
 }
 
-export function isGridAreaOccupied(
+function isGridAreaOccupied(
   snapshot: GridSnapshot,
   gridX: number,
   gridY: number,
@@ -98,7 +98,7 @@ export function isGridAreaOccupied(
   return false
 }
 
-export function clampGridPosition(
+function clampGridPosition(
   position: GridPosition,
   _size: GridSize,
   bounds: GridBounds,

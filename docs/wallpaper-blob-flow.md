@@ -92,10 +92,10 @@ store 里做三件事。
 这里不是保存 base64 字符串，而是直接保存 Blob：
 
 ```ts
-saveLargeStorageValue(WALLPAPER_BASE64_KEY, blob)
+saveLargeStorageValue(WALLPAPER_BLOB_KEY, blob)
 ```
 
-变量名里还带着 `BASE64`，是历史原因：旧版本这个 key 下面确实存过 base64。现在为了不破坏旧数据位置，仍然沿用这个 key，但值已经可以是 Blob。
+这个 key 只存 Blob，不接受字符串或其他壁纸表示。
 
 对应代码在 `src/stores/settings.ts`。
 
@@ -135,20 +135,6 @@ backgroundImage: `url(${src})`
 
 这就是文档开头说的原则：保存的是 Blob，显示时临时生成 blob URL。
 
-## 旧 base64 壁纸怎么兼容
-
-旧版本可能已经把壁纸保存成 base64 了。为了不让老用户升级后壁纸丢失，store 里保留了迁移逻辑。
-
-如果从旧存储里读到的是 base64 字符串，就会走：
-
-```ts
-base64ToBlob(...)
-```
-
-把它转成 Blob，再重新保存到 IndexedDB。之后运行时还是用 `blob:` URL 显示。
-
-这条兼容路径只服务旧数据。新的上传流程不会再主动创建完整 base64 data URL。
-
 ## 为什么壁纸不参与导入导出
 
 现在导入导出只负责配置，比如图标、搜索、布局、开关之类。
@@ -159,7 +145,6 @@ base64ToBlob(...)
 
 ```ts
 wallpaperUrl
-wallpaperBase64
 wallpaperColor
 wallpaperHistory
 ```
@@ -181,9 +166,6 @@ Pinia 里不再挂着几 MB 甚至十几 MB 的 base64 字符串。
 
 第四，大图会被缩到屏幕实际需要的尺寸。  
 用户传 4K 图时，不会无条件按 4K 原图保存和显示。
-
-第五，旧数据还能读。  
-已有 base64 壁纸会迁移成 Blob，不需要用户重新上传。
 
 ## 一句话总结
 

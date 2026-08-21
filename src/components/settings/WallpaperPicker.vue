@@ -54,7 +54,7 @@ async function applyUploadedImage(file: File) {
     const img = await loadImage(objectUrl)
     const blob = await resizeWallpaperImage(img, file)
     store.setWallpaperBlob(blob)
-    store.addToHistory({ source: '', sourceType: 'base64', label: file.name })
+    store.addToHistory({ source: '', sourceType: 'local', label: file.name })
   } finally {
     URL.revokeObjectURL(objectUrl)
   }

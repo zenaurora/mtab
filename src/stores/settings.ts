@@ -1,12 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { loadStorageValue, removeStorageValue, useStorage } from '../composables/useStorage'
+import { useStorage } from '../composables/useStorage'
 import { loadLargeStorageValue, saveLargeStorageValue } from '../composables/useLargeStorage'
 import {
   createGridSnapshot,
   findFirstFreePosition,
-  findNearestFreePosition,
-  occupyMovable,
   type GridBounds,
   type MovableGridItem,
 } from '../layout/gridLayout'
@@ -41,38 +39,36 @@ const DEFAULT_ENGINES: SearchEngine[] = [
 ]
 
 const DEFAULT_BOOKMARKS: Bookmark[] = [
-  { id: 'bm_gmail', name: 'Gmail', url: 'https://mail.google.com', gridX: 4, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_bilibili', name: 'Bilibili', url: 'https://www.bilibili.com', gridX: 5, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_github', name: 'GitHub', url: 'https://github.com', gridX: 6, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_xiaohongshu', name: '小红书', url: 'https://www.xiaohongshu.com', iconUrl: 'https://www.xiaohongshu.com/favicon.ico', gridX: 7, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_douyin', name: '抖音', url: 'https://www.douyin.com', gridX: 8, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_youtube', name: 'YouTube', url: 'https://www.youtube.com', gridX: 9, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_notion', name: 'Notion', url: 'https://www.notion.so', gridX: 10, gridY: 6, gridW: 1, gridH: 1 },
-  { id: 'bm_vercel', name: 'Vercel', url: 'https://vercel.com', gridX: 11, gridY: 6, gridW: 1, gridH: 1 },
+  { id: 'bm_gmail', name: 'Gmail', url: 'https://mail.google.com', gridX: 4, gridY: 6 },
+  { id: 'bm_bilibili', name: 'Bilibili', url: 'https://www.bilibili.com', gridX: 5, gridY: 6 },
+  { id: 'bm_github', name: 'GitHub', url: 'https://github.com', gridX: 6, gridY: 6 },
+  { id: 'bm_xiaohongshu', name: '小红书', url: 'https://www.xiaohongshu.com', iconUrl: 'https://www.xiaohongshu.com/favicon.ico', gridX: 7, gridY: 6 },
+  { id: 'bm_douyin', name: '抖音', url: 'https://www.douyin.com', gridX: 8, gridY: 6 },
+  { id: 'bm_youtube', name: 'YouTube', url: 'https://www.youtube.com', gridX: 9, gridY: 6 },
+  { id: 'bm_notion', name: 'Notion', url: 'https://www.notion.so', gridX: 10, gridY: 6 },
+  { id: 'bm_vercel', name: 'Vercel', url: 'https://vercel.com', gridX: 11, gridY: 6 },
 
-  { id: 'bm_chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com', gridX: 4, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com', gridX: 5, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_qwen', name: 'Qwen', url: 'https://chat.qwen.ai', gridX: 6, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_kimi', name: 'Kimi', url: 'https://kimi.com', gridX: 7, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_zai', name: 'Z.ai', url: 'https://chat.z.ai', gridX: 8, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_ai_studio', name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat', gridX: 9, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_ikuncode', name: 'iKunCode', url: 'https://api.ikuncode.cc', iconUrl: 'https://api.ikuncode.cc/favicon.ico', gridX: 10, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_claude', name: 'Claude', url: 'https://claude.ai', gridX: 11, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_gemini', name: 'Gemini', url: 'https://gemini.google.com', gridX: 12, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai', gridX: 13, gridY: 7, gridW: 1, gridH: 1 },
-  { id: 'bm_doubao', name: '豆包', url: 'https://www.doubao.com', gridX: 14, gridY: 7, gridW: 1, gridH: 1 },
+  { id: 'bm_chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com', gridX: 4, gridY: 7 },
+  { id: 'bm_deepseek', name: 'DeepSeek', url: 'https://chat.deepseek.com', gridX: 5, gridY: 7 },
+  { id: 'bm_qwen', name: 'Qwen', url: 'https://chat.qwen.ai', gridX: 6, gridY: 7 },
+  { id: 'bm_kimi', name: 'Kimi', url: 'https://kimi.com', gridX: 7, gridY: 7 },
+  { id: 'bm_zai', name: 'Z.ai', url: 'https://chat.z.ai', gridX: 8, gridY: 7 },
+  { id: 'bm_ai_studio', name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat', gridX: 9, gridY: 7 },
+  { id: 'bm_ikuncode', name: 'iKunCode', url: 'https://api.ikuncode.cc', iconUrl: 'https://api.ikuncode.cc/favicon.ico', gridX: 10, gridY: 7 },
+  { id: 'bm_claude', name: 'Claude', url: 'https://claude.ai', gridX: 11, gridY: 7 },
+  { id: 'bm_gemini', name: 'Gemini', url: 'https://gemini.google.com', gridX: 12, gridY: 7 },
+  { id: 'bm_perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai', gridX: 13, gridY: 7 },
+  { id: 'bm_doubao', name: '豆包', url: 'https://www.doubao.com', gridX: 14, gridY: 7 },
 
-  { id: 'bm_figma', name: 'Figma', url: 'https://www.figma.com', gridX: 4, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_monkeytype', name: 'Monkeytype', url: 'https://monkeytype.com', gridX: 5, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_zhihu', name: '知乎', url: 'https://www.zhihu.com', gridX: 6, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_wallhaven', name: 'Wallhaven', url: 'https://wallhaven.cc', gridX: 7, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_human_benchmark', name: 'Human Benchmark', url: 'https://humanbenchmark.com', gridX: 8, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_taobao', name: '淘宝', url: 'https://www.taobao.com', gridX: 9, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_jd', name: '京东', url: 'https://www.jd.com', gridX: 10, gridY: 8, gridW: 1, gridH: 1 },
-  { id: 'bm_google_scholar', name: 'Google Scholar', url: 'https://scholar.google.com', gridX: 11, gridY: 8, gridW: 1, gridH: 1 },
+  { id: 'bm_figma', name: 'Figma', url: 'https://www.figma.com', gridX: 4, gridY: 8 },
+  { id: 'bm_monkeytype', name: 'Monkeytype', url: 'https://monkeytype.com', gridX: 5, gridY: 8 },
+  { id: 'bm_zhihu', name: '知乎', url: 'https://www.zhihu.com', gridX: 6, gridY: 8 },
+  { id: 'bm_wallhaven', name: 'Wallhaven', url: 'https://wallhaven.cc', gridX: 7, gridY: 8 },
+  { id: 'bm_human_benchmark', name: 'Human Benchmark', url: 'https://humanbenchmark.com', gridX: 8, gridY: 8 },
+  { id: 'bm_taobao', name: '淘宝', url: 'https://www.taobao.com', gridX: 9, gridY: 8 },
+  { id: 'bm_jd', name: '京东', url: 'https://www.jd.com', gridX: 10, gridY: 8 },
+  { id: 'bm_google_scholar', name: 'Google Scholar', url: 'https://scholar.google.com', gridX: 11, gridY: 8 },
 ]
-
-const CURRENT_DEFAULT_BOOKMARK_SEED_VERSION = 4
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'default',
@@ -81,29 +77,20 @@ const DEFAULT_SETTINGS: Settings = {
   iconTileOpacity: 8,
   iconLabelColor: '',
   wallpaperUrl: '',
-  wallpaperBase64: '',
   wallpaperColor: '',
   wallpaperHistory: [],
   blurAmount: 0,
-  searchBarWidth: 50,
-  searchBarPosition: 'center',
-  searchBarOffsetY: 0,
+  searchBar: {
+    widthPercent: 50,
+    verticalPosition: 'center',
+    offsetY: 0,
+  },
   activeEngineId: 'google',
   searchEngines: DEFAULT_ENGINES,
   darkMode: true,
   performanceMode: false,
-  widgets: [
-    {
-      id: 'widget_search',
-      type: 'search',
-      gridX: 4,
-      gridY: 2,
-      gridW: 6,
-      gridH: 2,
-    },
-  ],
+  widgets: [],
   bookmarks: DEFAULT_BOOKMARKS,
-  defaultBookmarkSeedVersion: 0,
   showBrowserBookmarkBar: true,
   showAddButton: true,
   addButtonGridX: 15,
@@ -112,10 +99,43 @@ const DEFAULT_SETTINGS: Settings = {
 }
 
 const SETTINGS_KEY = 'mtab_settings'
-const WALLPAPER_BASE64_KEY = 'mtab_wallpaper_base64'
-const LEGACY_SEARCH_HISTORY_KEY = 'mtab_search_history'
-const LOCAL_WALLPAPER_SOURCE = '__local_wallpaper_base64__'
+const WALLPAPER_BLOB_KEY = 'mtab_wallpaper_blob'
 const STORAGE_GRID: GridBounds = { minX: 0, minY: 0, maxX: 19, maxY: 29 }
+const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
+  clock: { gridW: 2, gridH: 2 },
+  date: { gridW: 2, gridH: 1 },
+  notes: { gridW: 3, gridH: 3 },
+  bookmarks: { gridW: 3, gridH: 2 },
+}
+const WIDGET_TYPES = new Set(Object.keys(WIDGET_SIZES))
+
+function decodeSettings(value: unknown): Settings | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const settings = value as Record<string, unknown>
+  const searchBar = settings.searchBar
+  if (!searchBar || typeof searchBar !== 'object' || Array.isArray(searchBar)) return undefined
+  const search = searchBar as Record<string, unknown>
+  if (
+    typeof search.widthPercent !== 'number' ||
+    !['top', 'center', 'bottom'].includes(String(search.verticalPosition)) ||
+    typeof search.offsetY !== 'number' ||
+    !Array.isArray(settings.widgets) ||
+    settings.widgets.some((widget) =>
+      !widget ||
+      typeof widget !== 'object' ||
+      !WIDGET_TYPES.has(String((widget as Record<string, unknown>).type)),
+    ) ||
+    !Array.isArray(settings.bookmarks) ||
+    settings.bookmarks.some((bookmark) => {
+      if (!bookmark || typeof bookmark !== 'object') return true
+      const item = bookmark as Record<string, unknown>
+      return !Number.isInteger(item.gridX) || !Number.isInteger(item.gridY)
+    })
+  ) {
+    return undefined
+  }
+  return value as Settings
+}
 
 let uid = 0
 function genId(prefix = 'id'): string {
@@ -123,12 +143,7 @@ function genId(prefix = 'id'): string {
 }
 
 export const useSettingsStore = defineStore('settings', () => {
-  const { data, ready, load, save } = useStorage<Settings>(
-    SETTINGS_KEY,
-    { ...DEFAULT_SETTINGS },
-    sanitizeForStorage,
-    cleanupLegacyLargeStorage
-  )
+  const { data, load, save } = useStorage<Settings>(SETTINGS_KEY, DEFAULT_SETTINGS, decodeSettings)
 
   // Blob URL for local wallpaper. It is recreated from IndexedDB on load and
   // never persisted in the JSON settings payload.
@@ -138,15 +153,6 @@ export const useSettingsStore = defineStore('settings', () => {
     return URL.createObjectURL(blob)
   }
 
-  function base64ToBlob(base64: string): Blob {
-    const [header, body] = base64.split(',')
-    const mime = header.match(/data:([^;]+)/)?.[1] ?? 'image/jpeg'
-    const binary = atob(body)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    return new Blob([bytes], { type: mime })
-  }
-
   function revokeWallpaperBlobUrl() {
     if (wallpaperBlobUrl.value) {
       URL.revokeObjectURL(wallpaperBlobUrl.value)
@@ -154,55 +160,33 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  function sanitizeForStorage(settings: Settings): Settings {
-    const wallpaperHistory = Array.isArray(settings.wallpaperHistory) ? settings.wallpaperHistory : []
-    return {
-      ...settings,
-      wallpaperBase64: '',
-      wallpaperHistory: wallpaperHistory.map((entry) => ({
-        id: entry.id,
-        source: entry.sourceType === 'base64' ? LOCAL_WALLPAPER_SOURCE : entry.source,
-        sourceType: entry.sourceType,
-        label: entry.label,
-        addedAt: entry.addedAt,
-      })),
-    }
-  }
-
   // ── Wallpaper ──────────────────────────────────────────
   function setWallpaperUrl(url: string) {
     revokeWallpaperBlobUrl()
     data.value.wallpaperUrl = url
-    data.value.wallpaperBase64 = ''
     data.value.wallpaperColor = ''
   }
 
   function setWallpaperBlob(blob: Blob) {
     revokeWallpaperBlobUrl()
     wallpaperBlobUrl.value = createWallpaperBlobUrl(blob)
-    data.value.wallpaperBase64 = ''
     data.value.wallpaperUrl = ''
     data.value.wallpaperColor = ''
-    void saveLargeStorageValue(WALLPAPER_BASE64_KEY, blob)
-  }
-
-  function setWallpaperBase64(base64: string) {
-    setWallpaperBlob(base64ToBlob(base64))
+    void saveLargeStorageValue(WALLPAPER_BLOB_KEY, blob)
   }
 
   function setWallpaperColor(color: string) {
     revokeWallpaperBlobUrl()
     data.value.wallpaperColor = color
     data.value.wallpaperUrl = ''
-    data.value.wallpaperBase64 = ''
   }
 
   function clearWallpaper() {
     revokeWallpaperBlobUrl()
     data.value.wallpaperUrl = ''
-    data.value.wallpaperBase64 = ''
     data.value.wallpaperColor = ''
-    void saveLargeStorageValue(WALLPAPER_BASE64_KEY, '')
+    data.value.wallpaperHistory = data.value.wallpaperHistory.filter((entry) => entry.sourceType !== 'local')
+    void saveLargeStorageValue(WALLPAPER_BLOB_KEY, '')
   }
 
   function setBlurAmount(amount: number) {
@@ -211,13 +195,19 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // ── Wallpaper History ─────────────────────────────────
   function addToHistory(entry: Omit<WallpaperEntry, 'id' | 'addedAt'>) {
-    // Avoid duplicates by source
-    const normalizedSource = entry.sourceType === 'base64' ? LOCAL_WALLPAPER_SOURCE : entry.source
-    const existing = data.value.wallpaperHistory.find((h) => h.source === normalizedSource)
+    const existing = data.value.wallpaperHistory.find((item) =>
+      entry.sourceType === 'local'
+        ? item.sourceType === 'local'
+        : item.sourceType === entry.sourceType && item.source === entry.source,
+    )
+    if (existing && entry.sourceType === 'local') {
+      existing.label = entry.label
+      existing.addedAt = new Date().toISOString()
+      return existing.id
+    }
     if (existing) return existing.id
     const newEntry: WallpaperEntry = {
       ...entry,
-      source: normalizedSource,
       id: genId('wp'),
       addedAt: new Date().toISOString(),
     }
@@ -235,30 +225,26 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   function applyFromHistory(entry: WallpaperEntry) {
-    if (entry.sourceType === 'base64') {
-      if (entry.source === LOCAL_WALLPAPER_SOURCE) {
-        void loadStoredWallpaperBlob().then((blob) => {
-          if (blob) setWallpaperBlob(blob)
-        })
-      } else {
-        setWallpaperBase64(entry.source)
-      }
-    } else {
-      setWallpaperUrl(entry.source)
+    if (entry.sourceType === 'local') {
+      void loadStoredWallpaperBlob().then((blob) => {
+        if (blob) setWallpaperBlob(blob)
+      })
+      return
     }
+    setWallpaperUrl(entry.source)
   }
 
   // ── Search Bar ──────────────────────────────────────────
   function setSearchBarWidth(width: number) {
-    data.value.searchBarWidth = Math.max(20, Math.min(80, width))
+    data.value.searchBar.widthPercent = Math.max(20, Math.min(80, width))
   }
 
-  function setSearchBarPosition(pos: Settings['searchBarPosition']) {
-    data.value.searchBarPosition = pos
+  function setSearchBarPosition(pos: Settings['searchBar']['verticalPosition']) {
+    data.value.searchBar.verticalPosition = pos
   }
 
   function setSearchBarOffsetY(offset: number) {
-    data.value.searchBarOffsetY = offset
+    data.value.searchBar.offsetY = Math.max(-200, Math.min(200, offset))
   }
 
   function setActiveEngine(id: string) {
@@ -268,11 +254,6 @@ export const useSettingsStore = defineStore('settings', () => {
   function addSearchEngine(engine: Omit<SearchEngine, 'id'>) {
     const newEngine: SearchEngine = { ...engine, id: genId('engine') }
     data.value.searchEngines.push(newEngine)
-  }
-
-  function updateSearchEngine(id: string, patch: Partial<SearchEngine>) {
-    const engine = data.value.searchEngines.find((e) => e.id === id)
-    if (engine) Object.assign(engine, patch)
   }
 
   function removeSearchEngine(id: string) {
@@ -286,15 +267,6 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   // ── Widgets ──────────────────────────────────────────────
-  // Fixed sizes per widget type (in grid cells, each cell ~80px)
-  const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
-    clock: { gridW: 2, gridH: 2 },
-    date: { gridW: 2, gridH: 1 },
-    notes: { gridW: 3, gridH: 3 },
-    search: { gridW: 6, gridH: 1 },
-    bookmarks: { gridW: 3, gridH: 2 },
-  }
-
   // Find a free spot on the grid (considers widgets + positioned bookmarks)
   function findFreePosition(gridW: number, gridH: number, startRow = 0): { gridX: number; gridY: number } {
     const movableItems = positionedBookmarks()
@@ -366,7 +338,9 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   // ── Bookmarks ──────────────────────────────────────────
-  function addBookmark(bookmark: Omit<Bookmark, 'id'>) {
+  function addBookmark(
+    bookmark: Omit<Bookmark, 'id' | 'gridX' | 'gridY'> & Partial<Pick<Bookmark, 'gridX' | 'gridY'>>,
+  ) {
     const pos = bookmark.gridX !== undefined
       ? { gridX: bookmark.gridX, gridY: bookmark.gridY ?? 6 }
       : findFreePosition(1, 1, 6)
@@ -375,8 +349,6 @@ export const useSettingsStore = defineStore('settings', () => {
       id: genId('bm'),
       gridX: pos.gridX,
       gridY: pos.gridY,
-      gridW: 1,
-      gridH: 1,
     }
     data.value.bookmarks.push(newBookmark)
   }
@@ -431,11 +403,9 @@ export const useSettingsStore = defineStore('settings', () => {
   function exportConfig(): MTabConfig {
     const settings = JSON.parse(JSON.stringify(data.value)) as Settings
     settings.wallpaperUrl = ''
-    settings.wallpaperBase64 = ''
     settings.wallpaperColor = ''
     settings.wallpaperHistory = []
     return {
-      version: 1,
       exportedAt: new Date().toISOString(),
       settings,
     }
@@ -444,153 +414,15 @@ export const useSettingsStore = defineStore('settings', () => {
   function importConfig(config: unknown) {
     const imported = parseImportedConfig(config, data.value)
     Object.assign(data.value, imported)
-    normalizeSettingsShape()
-    normalizeLayoutPositions()
-  }
-
-  // ── Migration ──────────────────────────────────────────
-  function migrateBookmarkPositions() {
-    normalizeSettingsShape()
-    seedDefaultBookmarks()
-
-    data.value.showAddButton ??= true
-    data.value.showBrowserBookmarkBar ??= true
-    data.value.addButtonGridX ??= 15
-    data.value.addButtonGridY ??= 7
-
-    let startY = 6
-    for (const bm of data.value.bookmarks) {
-      if (bm.gridX === undefined || bm.gridY === undefined) {
-        const pos = findFreePosition(1, 1, startY)
-        bm.gridX = pos.gridX
-        bm.gridY = pos.gridY
-        bm.gridW = 1
-        bm.gridH = 1
-        startY = pos.gridX >= 14 ? pos.gridY + 1 : pos.gridY
-      }
-    }
-
-    normalizeLayoutPositions()
-  }
-
-  function seedDefaultBookmarks() {
-    if (data.value.defaultBookmarkSeedVersion >= CURRENT_DEFAULT_BOOKMARK_SEED_VERSION) return
-
-    const existingIds = new Set(data.value.bookmarks.map((bm) => bm.id))
-    const defaultById = new Map(DEFAULT_BOOKMARKS.map((bm) => [bm.id, bm]))
-    for (const bm of DEFAULT_BOOKMARKS) {
-      if (!existingIds.has(bm.id)) {
-        data.value.bookmarks.push({ ...bm })
-      }
-    }
-    for (const bm of data.value.bookmarks) {
-      const defaultBookmark = defaultById.get(bm.id)
-      if (defaultBookmark?.iconUrl && !bm.iconUrl) {
-        bm.iconUrl = defaultBookmark.iconUrl
-      }
-    }
-    data.value.defaultBookmarkSeedVersion = CURRENT_DEFAULT_BOOKMARK_SEED_VERSION
-  }
-
-  function normalizeSettingsShape() {
-    if (typeof data.value.iconLabelColor !== 'string' ||
-      (data.value.iconLabelColor !== '' && !/^#[0-9a-f]{6}$/i.test(data.value.iconLabelColor))) {
-      data.value.iconLabelColor = ''
-    }
-    if (!Array.isArray(data.value.searchEngines) || data.value.searchEngines.length === 0) {
-      data.value.searchEngines = [...DEFAULT_ENGINES]
-    }
-    if (!Array.isArray(data.value.widgets)) {
-      data.value.widgets = []
-    }
-    const searchWidget = data.value.widgets.find((w) => w.type === 'search')
-    if (searchWidget) {
-      searchWidget.gridX = 4
-      searchWidget.gridY = 2
-      searchWidget.gridW = 6
-      searchWidget.gridH = 1
-    } else {
-      data.value.widgets.unshift({
-        id: 'widget_search',
-        type: 'search',
-        gridX: 4,
-        gridY: 2,
-        gridW: 6,
-        gridH: 1,
-      })
-    }
-    if (!Array.isArray(data.value.bookmarks)) {
-      data.value.bookmarks = [...DEFAULT_BOOKMARKS.map((bm) => ({ ...bm }))]
-    }
-    if (!Array.isArray(data.value.wallpaperHistory)) {
-      data.value.wallpaperHistory = []
-    }
-  }
-
-  function normalizeLayoutPositions() {
-    const snapshot = createGridSnapshot([], data.value.widgets)
-    const iconSize = { gridW: 1, gridH: 1 }
-    const iconBounds = boundsForSize(1, 1)
-
-    for (const bm of data.value.bookmarks) {
-      const gridX = bm.gridX ?? 0
-      const gridY = bm.gridY ?? 0
-      const position = findNearestFreePosition(snapshot, { gridX, gridY }, iconSize, iconBounds)
-      bm.gridX = position.gridX
-      bm.gridY = position.gridY
-      bm.gridW = 1
-      bm.gridH = 1
-      occupyMovable(snapshot, { id: bm.id, ...position })
-    }
-
-    if (data.value.showAddButton) {
-      const position = findNearestFreePosition(
-        snapshot,
-        { gridX: data.value.addButtonGridX, gridY: data.value.addButtonGridY },
-        iconSize,
-        iconBounds,
-      )
-      data.value.addButtonGridX = position.gridX
-      data.value.addButtonGridY = position.gridY
-    }
-  }
-
-  async function migrateLegacyWallpaperBase64() {
-    const oldWallpaper = await loadStorageValue<string>(WALLPAPER_BASE64_KEY)
-    if (oldWallpaper) {
-      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, base64ToBlob(oldWallpaper))
-    }
-    await removeStorageValue(WALLPAPER_BASE64_KEY)
-    return oldWallpaper ? base64ToBlob(oldWallpaper) : undefined
-  }
-
-  async function cleanupLegacyLargeStorage() {
-    await migrateLegacyWallpaperBase64()
-    await removeStorageValue(LEGACY_SEARCH_HISTORY_KEY)
   }
 
   async function loadStoredWallpaperBlob() {
-    const indexedDbValue = await loadLargeStorageValue<unknown>(WALLPAPER_BASE64_KEY)
-    if (indexedDbValue instanceof Blob) {
-      await removeStorageValue(WALLPAPER_BASE64_KEY)
-      return indexedDbValue
-    }
-    if (typeof indexedDbValue === 'string') {
-      const blob = base64ToBlob(indexedDbValue)
-      await saveLargeStorageValue(WALLPAPER_BASE64_KEY, blob)
-      await removeStorageValue(WALLPAPER_BASE64_KEY)
-      return blob
-    }
-
-    return migrateLegacyWallpaperBase64()
+    const wallpaper = await loadLargeStorageValue<unknown>(WALLPAPER_BLOB_KEY)
+    return wallpaper instanceof Blob ? wallpaper : undefined
   }
 
   function positionedBookmarks(): MovableGridItem[] {
-    return data.value.bookmarks.flatMap((bookmark) =>
-      bookmark.gridX === undefined || bookmark.gridY === undefined
-        ? []
-        : [{ id: bookmark.id, gridX: bookmark.gridX, gridY: bookmark.gridY }],
-    )
+    return data.value.bookmarks.map(({ id, gridX, gridY }) => ({ id, gridX, gridY }))
   }
 
   function boundsForSize(gridW: number, gridH: number): GridBounds {
@@ -603,28 +435,18 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     data,
-    ready,
     wallpaperBlobUrl,
     async load() {
-      await cleanupLegacyLargeStorage()
       await load()
-      if (data.value.wallpaperBase64) {
-        // Migration: base64 ended up in Chrome storage, move to IndexedDB as a Blob.
-        await saveLargeStorageValue(WALLPAPER_BASE64_KEY, base64ToBlob(data.value.wallpaperBase64))
-        data.value.wallpaperBase64 = ''
-      }
       const localWallpaper = await loadStoredWallpaperBlob()
       if (localWallpaper && !data.value.wallpaperUrl && !data.value.wallpaperColor) {
         wallpaperBlobUrl.value = createWallpaperBlobUrl(localWallpaper)
       }
-      migrateBookmarkPositions()
-      await save()
     },
     save,
     // wallpaper
     setWallpaperUrl,
     setWallpaperBlob,
-    setWallpaperBase64,
     setWallpaperColor,
     clearWallpaper,
     setBlurAmount,
@@ -638,13 +460,11 @@ export const useSettingsStore = defineStore('settings', () => {
     setSearchBarOffsetY,
     setActiveEngine,
     addSearchEngine,
-    updateSearchEngine,
     removeSearchEngine,
     // widgets
     addWidget,
     removeWidget,
     moveWidget,
-    findFreePosition,
     // bookmarks
     addBookmark,
     updateBookmark,
@@ -653,7 +473,6 @@ export const useSettingsStore = defineStore('settings', () => {
     moveAddButton,
     hideAddButton,
     showAddButton,
-    migrateBookmarkPositions,
     // notes
     setNotesContent,
     // theme & display

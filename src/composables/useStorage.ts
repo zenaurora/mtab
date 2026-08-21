@@ -12,8 +12,7 @@ const isChromeExtension =
 export function useStorage<T>(
   key: string,
   defaultValue: T,
-  serializeValue: (value: T) => T = (value) => value,
-  onSaveError?: (error: unknown) => Promise<void> | void
+  decodeValue: (value: unknown) => T | undefined,
 ): {
   data: Ref<T>
   ready: Ref<boolean>
@@ -31,12 +30,16 @@ export function useStorage<T>(
       if (isChromeExtension) {
         const result = await chrome.storage.local.get(key)
         if (result[key] !== undefined) {
-          data.value = mergeDefaultValue(defaultValue, result[key]) as T
+          const decoded = decodeValue(result[key])
+          if (decoded !== undefined) data.value = cloneValue(decoded)
+          else await persistCurrentValue()
         }
       } else {
         const stored = localStorage.getItem(key)
         if (stored !== null) {
-          data.value = mergeDefaultValue(defaultValue, JSON.parse(stored)) as T
+          const decoded = decodeValue(JSON.parse(stored))
+          if (decoded !== undefined) data.value = cloneValue(decoded)
+          else await persistCurrentValue()
         }
       }
     } catch (e) {
@@ -49,7 +52,7 @@ export function useStorage<T>(
   async function persistCurrentValue() {
     // Convert Vue reactive proxies into plain JSON-compatible data before
     // handing the payload to chrome.storage.
-    const value = cloneValue(serializeValue(data.value))
+    const value = cloneValue(data.value)
     if (isChromeExtension) {
       await chrome.storage.local.set({ [key]: value })
     } else {
@@ -66,31 +69,17 @@ export function useStorage<T>(
     }
   }
 
-  async function persistWithRetry() {
+  async function persistSafely() {
     const firstError = await tryPersist()
     if (firstError === null) return
 
-    if (!onSaveError) {
-      console.warn(`[useStorage] Failed to save key "${key}":`, firstError)
-      return
-    }
-
-    try {
-      await onSaveError(firstError)
-    } catch (cleanupError) {
-      console.warn(`[useStorage] Failed to run cleanup for key "${key}":`, cleanupError)
-    }
-
-    const retryError = await tryPersist()
-    if (retryError !== null) {
-      console.warn(`[useStorage] Failed to save key "${key}":`, retryError)
-    }
+    console.warn(`[useStorage] Failed to save key "${key}":`, firstError)
   }
 
   async function flushSaveQueue() {
     while (needsSave) {
       needsSave = false
-      await persistWithRetry()
+      await persistSafely()
     }
   }
 
@@ -125,23 +114,6 @@ export function useStorage<T>(
 
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
-}
-
-function mergeDefaultValue<T>(defaultValue: T, storedValue: unknown): T {
-  if (
-    defaultValue &&
-    typeof defaultValue === 'object' &&
-    !Array.isArray(defaultValue) &&
-    storedValue &&
-    typeof storedValue === 'object' &&
-    !Array.isArray(storedValue)
-  ) {
-    return {
-      ...(cloneValue(defaultValue) as Record<string, unknown>),
-      ...(storedValue as Record<string, unknown>),
-    } as T
-  }
-  return storedValue as T
 }
 
 export async function loadStorageValue<T>(key: string): Promise<T | undefined> {
