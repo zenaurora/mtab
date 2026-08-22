@@ -37,6 +37,10 @@ export type DropPlan = {
   occupied: boolean
 }
 
+export type BlockerDropPlan = DropPlan & {
+  position: GridPosition
+}
+
 function cellKey(gridX: number, gridY: number): CellKey {
   return `${gridX},${gridY}`
 }
@@ -98,6 +102,21 @@ function isGridAreaOccupied(
   return false
 }
 
+function isGridAreaBlocked(
+  snapshot: GridSnapshot,
+  gridX: number,
+  gridY: number,
+  gridW: number,
+  gridH: number,
+): boolean {
+  for (let dx = 0; dx < gridW; dx++) {
+    for (let dy = 0; dy < gridH; dy++) {
+      if (snapshot.blocked.has(cellKey(gridX + dx, gridY + dy))) return true
+    }
+  }
+  return false
+}
+
 function clampGridPosition(
   position: GridPosition,
   _size: GridSize,
@@ -138,6 +157,79 @@ export function findNearestFreePosition(
   }
 
   return start
+}
+
+function findNearestUnblockedPosition(
+  snapshot: GridSnapshot,
+  preferred: GridPosition,
+  size: GridSize,
+  bounds: GridBounds,
+): GridPosition {
+  const start = clampGridPosition(preferred, size, bounds)
+  if (!isGridAreaBlocked(snapshot, start.gridX, start.gridY, size.gridW, size.gridH)) {
+    return start
+  }
+
+  const maxRadius = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + 1
+  for (let radius = 1; radius <= maxRadius; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue
+        const gridX = start.gridX + dx
+        const gridY = start.gridY + dy
+        if (gridX < bounds.minX || gridX > bounds.maxX || gridY < bounds.minY || gridY > bounds.maxY) {
+          continue
+        }
+        if (!isGridAreaBlocked(snapshot, gridX, gridY, size.gridW, size.gridH)) {
+          return { gridX, gridY }
+        }
+      }
+    }
+  }
+
+  return start
+}
+
+export function planBlockerDrop(
+  target: GridPosition,
+  size: GridSize,
+  baseSnapshot: GridSnapshot,
+  blockerBounds: GridBounds,
+  movableBounds: GridBounds,
+): BlockerDropPlan {
+  // Widgets may displace one-cell movable items, but never overlap fixed
+  // blockers such as the search bar or another widget.
+  const position = findNearestUnblockedPosition(baseSnapshot, target, size, blockerBounds)
+  const snapshot = cloneGridSnapshot(baseSnapshot)
+  const displaced = new Map<string, MovableGridItem>()
+
+  for (let dx = 0; dx < size.gridW; dx++) {
+    for (let dy = 0; dy < size.gridH; dy++) {
+      const occupant = snapshot.movable.get(cellKey(position.gridX + dx, position.gridY + dy))
+      if (occupant) displaced.set(occupant.id, occupant)
+    }
+  }
+
+  for (const item of displaced.values()) {
+    snapshot.movable.delete(cellKey(item.gridX, item.gridY))
+  }
+  occupyBlocker(snapshot, { ...position, ...size })
+
+  const patches: GridPositionPatch[] = []
+  for (const item of displaced.values()) {
+    const free = findNearestFreePosition(
+      snapshot,
+      item,
+      { gridW: 1, gridH: 1 },
+      movableBounds,
+    )
+    const patch = { id: item.id, ...free }
+    occupyMovable(snapshot, patch)
+    patches.push(patch)
+  }
+
+  const targetWasBlocked = position.gridX !== target.gridX || position.gridY !== target.gridY
+  return { position, patches, occupied: targetWasBlocked || displaced.size > 0 }
 }
 
 export function findFirstFreePosition(

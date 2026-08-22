@@ -86,6 +86,37 @@ test('Add icon animates out of the way when another icon is dragged onto it', as
   assert.deepEqual(canvas.previewPositions[addButtonId], { gridX: 11, gridY: 8 })
 })
 
+test('icons preview a free position when a multi-cell widget is dragged over them', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  const bookmark = canvas.store.data.bookmarks[0]
+  const widget = {
+    id: 'widget_currency',
+    type: 'currency',
+    gridX: 1,
+    gridY: 1,
+    gridW: 3,
+    gridH: 3,
+  }
+  bookmark.gridX = 1
+  bookmark.gridY = 9
+  canvas.store.data.widgets = [widget]
+  canvas.dragKind.value = 'widget'
+  canvas.draggingId.value = widget.id
+
+  canvas.updatePreviewPositions(bookmark.gridX, bookmark.gridY)
+
+  const preview = canvas.previewPositions[bookmark.id]
+  assert.ok(preview, 'the covered icon should receive a preview position')
+  assert.equal(
+    preview.gridX >= bookmark.gridX &&
+      preview.gridX < bookmark.gridX + widget.gridW &&
+      preview.gridY >= bookmark.gridY &&
+      preview.gridY < bookmark.gridY + widget.gridH,
+    false,
+    'the preview position should be outside the widget footprint',
+  )
+})
+
 test('global pointer listeners only stay active during a drag interaction', async () => {
   const canvas = await loadDesktopCanvasSetup()
   const added = []

@@ -76,6 +76,34 @@ test('settings use the current canonical schema only', async () => {
   }
 })
 
+test('currency converter is present on a new desktop by default', async () => {
+  setActivePinia(createPinia())
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem() {},
+  }
+  const server = await createServer({
+    appType: 'custom',
+    server: { hmr: false, middlewareMode: true, ws: false },
+  })
+
+  try {
+    const { useSettingsStore } = await server.ssrLoadModule('/src/stores/settings.ts')
+    const store = useSettingsStore()
+    assert.deepEqual(store.data.widgets, [{
+      id: 'widget_currency_default',
+      type: 'currency',
+      gridX: 0,
+      gridY: 6,
+      gridW: 3,
+      gridH: 3,
+    }])
+  } finally {
+    await server.close()
+  }
+})
+
 test('valid settings from before icon-area controls are migrated and persisted', async () => {
   setActivePinia(createPinia())
   let storedValue = null
@@ -112,6 +140,54 @@ test('valid settings from before icon-area controls are migrated and persisted',
 
     assert.deepEqual(migratedStore.data.iconArea, { leftPercent: 0, rightPercent: 0 })
     assert.deepEqual(JSON.parse(storedValue).iconArea, { leftPercent: 0, rightPercent: 0 })
+  } finally {
+    await server.close()
+  }
+})
+
+test('legacy currency widgets are narrowed to the canonical three-cell size', async () => {
+  setActivePinia(createPinia())
+  let storedValue = null
+  globalThis.localStorage = {
+    getItem() {
+      return storedValue
+    },
+    setItem(_key, value) {
+      storedValue = value
+    },
+    removeItem() {},
+  }
+  const server = await createServer({
+    appType: 'custom',
+    server: { hmr: false, middlewareMode: true, ws: false },
+  })
+
+  try {
+    const { useSettingsStore } = await server.ssrLoadModule('/src/stores/settings.ts')
+    const seedStore = useSettingsStore()
+    const settings = seedStore.exportConfig().settings
+    settings.widgets = [{
+      id: 'widget_currency',
+      type: 'currency',
+      gridX: 1,
+      gridY: 1,
+      gridW: 4,
+      gridH: 3,
+    }]
+    storedValue = JSON.stringify(settings)
+
+    setActivePinia(createPinia())
+    const migratedStore = useSettingsStore()
+    const originalWarn = console.warn
+    console.warn = () => {}
+    try {
+      await migratedStore.load()
+    } finally {
+      console.warn = originalWarn
+    }
+
+    assert.equal(migratedStore.data.widgets[0].gridW, 3)
+    assert.equal(JSON.parse(storedValue).widgets[0].gridW, 3)
   } finally {
     await server.close()
   }

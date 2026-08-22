@@ -19,7 +19,9 @@ import type {
   MTabConfig,
   ThemeId,
   WallpaperEntry,
+  CurrencyCode,
 } from '../types'
+import { isSupportedCurrencyCode } from '../exchange/exchangeRate'
 
 const DEFAULT_ENGINES: SearchEngine[] = [
   {
@@ -94,13 +96,26 @@ const DEFAULT_SETTINGS: Settings = {
   searchEngines: DEFAULT_ENGINES,
   darkMode: true,
   performanceMode: false,
-  widgets: [],
+  widgets: [
+    {
+      id: 'widget_currency_default',
+      type: 'currency',
+      gridX: 0,
+      gridY: 6,
+      gridW: 3,
+      gridH: 3,
+    },
+  ],
   bookmarks: DEFAULT_BOOKMARKS,
   showBrowserBookmarkBar: true,
   showAddButton: true,
   addButtonGridX: 15,
   addButtonGridY: 7,
   notesContent: '',
+  currencyConverter: {
+    baseCurrency: 'CNY',
+    quoteCurrency: 'USD',
+  },
 }
 
 const SETTINGS_KEY = 'mtab_settings'
@@ -111,6 +126,7 @@ const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
   date: { gridW: 2, gridH: 1 },
   notes: { gridW: 3, gridH: 3 },
   bookmarks: { gridW: 3, gridH: 2 },
+  currency: { gridW: 3, gridH: 3 },
 }
 const WIDGET_TYPES = new Set(Object.keys(WIDGET_SIZES))
 
@@ -142,29 +158,67 @@ function decodeSettings(value: unknown, onMigration: () => void): Settings | und
 
   // Settings saved before icon-area controls existed remain valid and receive
   // the non-restrictive default. New payloads are validated at the same seam.
+  let normalized = value as Settings
+  let migrated = false
+
   const iconArea = settings.iconArea
   if (iconArea === undefined) {
-    onMigration()
-    return {
-      ...(value as Settings),
-      iconArea: { ...DEFAULT_SETTINGS.iconArea },
+    normalized = { ...normalized, iconArea: { ...DEFAULT_SETTINGS.iconArea } }
+    migrated = true
+  } else {
+    if (!iconArea || typeof iconArea !== 'object' || Array.isArray(iconArea)) return undefined
+    const area = iconArea as Record<string, unknown>
+    if (
+      typeof area.leftPercent !== 'number' ||
+      !Number.isFinite(area.leftPercent) ||
+      area.leftPercent < 0 ||
+      area.leftPercent > ICON_AREA_MAX_INSET_PERCENT ||
+      typeof area.rightPercent !== 'number' ||
+      !Number.isFinite(area.rightPercent) ||
+      area.rightPercent < 0 ||
+      area.rightPercent > ICON_AREA_MAX_INSET_PERCENT
+    ) {
+      return undefined
     }
   }
-  if (!iconArea || typeof iconArea !== 'object' || Array.isArray(iconArea)) return undefined
-  const area = iconArea as Record<string, unknown>
-  if (
-    typeof area.leftPercent !== 'number' ||
-    !Number.isFinite(area.leftPercent) ||
-    area.leftPercent < 0 ||
-    area.leftPercent > ICON_AREA_MAX_INSET_PERCENT ||
-    typeof area.rightPercent !== 'number' ||
-    !Number.isFinite(area.rightPercent) ||
-    area.rightPercent < 0 ||
-    area.rightPercent > ICON_AREA_MAX_INSET_PERCENT
-  ) {
-    return undefined
+
+  const currencyConverter = settings.currencyConverter
+  if (currencyConverter === undefined) {
+    normalized = {
+      ...normalized,
+      currencyConverter: { ...DEFAULT_SETTINGS.currencyConverter },
+    }
+    migrated = true
+  } else {
+    if (!currencyConverter || typeof currencyConverter !== 'object' || Array.isArray(currencyConverter)) {
+      return undefined
+    }
+    const converter = currencyConverter as Record<string, unknown>
+    if (
+      !isSupportedCurrencyCode(converter.baseCurrency) ||
+      !isSupportedCurrencyCode(converter.quoteCurrency) ||
+      converter.baseCurrency === converter.quoteCurrency
+    ) {
+      return undefined
+    }
   }
-  return value as Settings
+
+  const storedWidgets = normalized.widgets
+  const hasLegacyCurrencySize = storedWidgets.some(
+    (widget) => widget.type === 'currency' && (widget.gridW !== 3 || widget.gridH !== 3),
+  )
+  if (hasLegacyCurrencySize) {
+    normalized = {
+      ...normalized,
+      widgets: storedWidgets.map((widget) =>
+        widget.type === 'currency' ? { ...widget, gridW: 3, gridH: 3 } : widget,
+      ),
+    }
+    migrated = true
+  }
+
+  if (migrated) onMigration()
+  return normalized
 }
 
 let uid = 0
@@ -350,6 +404,12 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  function setCurrencyPair(baseCurrency: CurrencyCode, quoteCurrency: CurrencyCode) {
+    if (baseCurrency === quoteCurrency) return
+    data.value.currencyConverter.baseCurrency = baseCurrency
+    data.value.currencyConverter.quoteCurrency = quoteCurrency
+  }
+
   function moveBookmarks(patches: Array<{ id: string; gridX: number; gridY: number }>) {
     if (patches.length === 0) return
     const byId = new Map(data.value.bookmarks.map((b) => [b.id, b]))
@@ -514,6 +574,7 @@ export const useSettingsStore = defineStore('settings', () => {
     addWidget,
     removeWidget,
     moveWidget,
+    setCurrencyPair,
     // bookmarks
     addBookmark,
     updateBookmark,

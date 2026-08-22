@@ -11,7 +11,20 @@ export interface SearchEngine {
 }
 
 // Widget types
-export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks'
+export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks' | 'currency'
+
+export type CurrencyCode =
+  | 'CNY'
+  | 'USD'
+  | 'EUR'
+  | 'GBP'
+  | 'JPY'
+  | 'HKD'
+  | 'KRW'
+  | 'SGD'
+  | 'AUD'
+  | 'CAD'
+  | 'CHF'
 
 export interface Widget {
   id: string
@@ -94,6 +107,12 @@ export interface Settings {
 
   // Notes widget content
   notesContent: string
+
+  // Currency converter widget
+  currencyConverter: {
+    baseCurrency: CurrencyCode
+    quoteCurrency: CurrencyCode
+  }
 }
 
 // Export/import config structure

@@ -1,8 +1,9 @@
 import type { Bookmark, SearchEngine, Settings, Widget, WidgetType } from '../types'
 import { THEME_IDS } from '../themes'
 import { ICON_AREA_MAX_INSET_PERCENT } from '../layout/iconArea'
+import { SUPPORTED_CURRENCY_CODES } from '../exchange/exchangeRate'
 
-const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks'])
+const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks', 'currency'])
 const SEARCH_POSITIONS = new Set<Settings['searchBar']['verticalPosition']>(['top', 'center', 'bottom'])
 
 export function parseImportedConfig(input: unknown, current: Settings): Settings {
@@ -74,6 +75,24 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
     next.addButtonGridY = expectInteger(raw.addButtonGridY, 'addButtonGridY', 0)
   }
   if ('notesContent' in raw) next.notesContent = expectString(raw.notesContent, 'notesContent')
+  if ('currencyConverter' in raw) {
+    const converter = expectRecord(raw.currencyConverter, 'currencyConverter')
+    next.currencyConverter = {
+      baseCurrency: expectMember(
+        converter.baseCurrency,
+        SUPPORTED_CURRENCY_CODES,
+        'currencyConverter.baseCurrency',
+      ),
+      quoteCurrency: expectMember(
+        converter.quoteCurrency,
+        SUPPORTED_CURRENCY_CODES,
+        'currencyConverter.quoteCurrency',
+      ),
+    }
+    if (next.currencyConverter.baseCurrency === next.currencyConverter.quoteCurrency) {
+      throw new Error('currencyConverter currencies must be different')
+    }
+  }
 
   if (!next.searchEngines.some((engine) => engine.id === next.activeEngineId)) {
     next.activeEngineId = next.searchEngines[0]?.id ?? ''
@@ -109,13 +128,14 @@ function parseWidgets(value: unknown): Widget[] {
   if (!Array.isArray(value)) throw new Error('widgets must be an array')
   const widgets = value.map((entry, index) => {
     const widget = expectRecord(entry, `widgets[${index}]`)
+    const type = expectMember(widget.type, WIDGET_TYPES, `widgets[${index}].type`)
     return {
       id: expectString(widget.id, `widgets[${index}].id`, true),
-      type: expectMember(widget.type, WIDGET_TYPES, `widgets[${index}].type`),
+      type,
       gridX: expectInteger(widget.gridX, `widgets[${index}].gridX`, 0),
       gridY: expectInteger(widget.gridY, `widgets[${index}].gridY`, 0),
-      gridW: expectInteger(widget.gridW, `widgets[${index}].gridW`, 1),
-      gridH: expectInteger(widget.gridH, `widgets[${index}].gridH`, 1),
+      gridW: type === 'currency' ? 3 : expectInteger(widget.gridW, `widgets[${index}].gridW`, 1),
+      gridH: type === 'currency' ? 3 : expectInteger(widget.gridH, `widgets[${index}].gridH`, 1),
     }
   })
   assertUniqueIds(widgets, 'widgets')

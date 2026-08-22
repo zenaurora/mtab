@@ -7,6 +7,7 @@ import DateWidget from './widgets/DateWidget.vue'
 import NotesWidget from './widgets/NotesWidget.vue'
 import SearchWidget from './widgets/SearchWidget.vue'
 import BookmarkWidget from './widgets/BookmarkWidget.vue'
+import CurrencyWidget from './widgets/CurrencyWidget.vue'
 import BookmarkIcon from './BookmarkIcon.vue'
 import BookmarkEditorModal from './BookmarkEditorModal.vue'
 import {
@@ -15,6 +16,7 @@ import {
   occupyBlocker,
   occupyMovable,
   planMovableDrop,
+  planBlockerDrop,
   resolveGridPatches,
   type DropPlan,
   type GridBounds,
@@ -22,6 +24,7 @@ import {
   type GridRect,
   type GridSnapshot,
   type MovableGridItem,
+  type BlockerDropPlan,
 } from '../layout/gridLayout'
 import { calculateIconAreaLayout } from '../layout/iconArea'
 
@@ -68,6 +71,7 @@ const dragStartGridY = ref(0)
 const previewPositions = reactive<Record<string, { gridX: number; gridY: number }>>({})
 let dragSnapshot: GridSnapshot | null = null
 let lastDropPlan: DropPlan | null = null
+let lastBlockerDropPlan: BlockerDropPlan | null = null
 
 // ── Computed ─────────────────────────────────────────────────
 const draggingWidget = computed(() =>
@@ -439,7 +443,7 @@ function stopDragListeners() {
 function onWidgetPointerDown(e: PointerEvent, widgetId: string, gx: number, gy: number, gw: number, gh: number) {
   if (e.button !== 0) return
   const target = e.target as HTMLElement
-  if (target.closest('button') || target.closest('textarea') || target.closest('input') || target.closest('a')) return
+  if (target.closest('button, textarea, input, select, a, [data-no-drag]')) return
 
   beginDrag(e, { id: widgetId, kind: 'widget', gridX: gx, gridY: gy, gridW: gw, gridH: gh })
 }
@@ -559,8 +563,21 @@ function planIconDrop(id: string, rawX: number, rawY: number, baseSnapshot = dra
   )
 }
 
-function commitIconPatches(patches: BookmarkPositionPatch[]) {
-  const normalizedPatches = resolvePatchCollisions(patches)
+function planWidgetDrop(rawX: number, rawY: number): BlockerDropPlan | null {
+  if (!draggingId.value) return null
+  const widget = store.data.widgets.find((item) => item.id === draggingId.value)
+  if (!widget) return null
+  return planBlockerDrop(
+    { gridX: rawX, gridY: rawY },
+    { gridW: widget.gridW, gridH: widget.gridH },
+    dragSnapshot ?? buildOccupancySnapshot(widget.id, true),
+    gridBounds(widget.gridW, widget.gridH),
+    iconGridBounds.value,
+  )
+}
+
+function commitIconPatches(patches: BookmarkPositionPatch[], blockerRects?: GridRect[]) {
+  const normalizedPatches = resolvePatchCollisions(patches, blockerRects)
   const bookmarkPatches = normalizedPatches.filter((patch) => patch.id !== ADD_BTN_ID)
   const addPatch = normalizedPatches.find((patch) => patch.id === ADD_BTN_ID)
 
@@ -568,7 +585,7 @@ function commitIconPatches(patches: BookmarkPositionPatch[]) {
   if (addPatch) store.moveAddButton(addPatch.gridX, addPatch.gridY)
 }
 
-function resolvePatchCollisions(patches: BookmarkPositionPatch[]) {
+function resolvePatchCollisions(patches: BookmarkPositionPatch[], blockerRects?: GridRect[]) {
   const movableItems: MovableGridItem[] = store.data.bookmarks.map(({ id, gridX, gridY }) => ({
     id,
     gridX,
@@ -581,18 +598,26 @@ function resolvePatchCollisions(patches: BookmarkPositionPatch[]) {
       gridY: store.data.addButtonGridY,
     })
   }
-  const blockerRects: GridRect[] = [searchGridRect.value, ...store.data.widgets]
-  return resolveGridPatches(patches, movableItems, blockerRects, iconGridBounds.value)
+  const blockers = blockerRects ?? [searchGridRect.value, ...store.data.widgets]
+  return resolveGridPatches(patches, movableItems, blockers, iconGridBounds.value)
 }
 
 function updatePreviewPositions(rawX: number, rawY: number): DropPlan {
-  if (dragKind.value !== 'icon' || !draggingId.value) {
+  if (!draggingId.value) {
     for (const key in previewPositions) delete previewPositions[key]
     lastDropPlan = { patches: [], occupied: false }
     return lastDropPlan
   }
 
-  const plan = planIconDrop(draggingId.value, rawX, rawY)
+  const plan = dragKind.value === 'widget'
+    ? planWidgetDrop(rawX, rawY)
+    : planIconDrop(draggingId.value, rawX, rawY)
+  if (!plan) {
+    for (const key in previewPositions) delete previewPositions[key]
+    lastDropPlan = { patches: [], occupied: false }
+    return lastDropPlan
+  }
+  lastBlockerDropPlan = dragKind.value === 'widget' ? plan as BlockerDropPlan : null
   const newKeys = new Set(plan.patches.map((p) => p.id))
   for (const key in previewPositions) {
     if (!newKeys.has(key)) delete previewPositions[key]
@@ -629,7 +654,16 @@ function onPointerUp() {
     const w = store.data.widgets.find((x) => x.id === draggingId.value)
     const gw = w?.gridW ?? 1
     const gh = w?.gridH ?? 1
-    const pos = findFreePosition(rawX, rawY, gw, gh, draggingId.value)
+    const plan = lastBlockerDropPlan ?? planWidgetDrop(rawX, rawY)
+    const pos = plan?.position ?? findFreePosition(rawX, rawY, gw, gh, draggingId.value)
+    if (plan && w) {
+      const blockers: GridRect[] = [
+        searchGridRect.value,
+        ...store.data.widgets.filter((widget) => widget.id !== w.id),
+        { ...pos, gridW: gw, gridH: gh },
+      ]
+      commitIconPatches(plan.patches, blockers)
+    }
     markInstantMove(draggingId.value)
     store.moveWidget(draggingId.value, pos.gridX, pos.gridY)
   } else if (dragKind.value === 'icon' && draggingId.value) {
@@ -652,6 +686,7 @@ function resetDrag() {
   for (const key in previewPositions) delete previewPositions[key]
   dragSnapshot = null
   lastDropPlan = null
+  lastBlockerDropPlan = null
   lastSnapGridX = -1
   lastSnapGridY = -1
   stopDragListeners()
@@ -682,6 +717,7 @@ const componentMap: Record<WidgetType, typeof ClockWidget> = {
   date: DateWidget,
   notes: NotesWidget,
   bookmarks: BookmarkWidget,
+  currency: CurrencyWidget,
 }
 
 watch(
@@ -735,7 +771,7 @@ onUnmounted(() => {
 
     <!-- ── Widgets (free-form grid) ─────────────────────────── -->
     <div v-for="w in store.data.widgets" :key="w.id" class="canvas-item widget-item"
-      :class="itemClass(w.id)"
+      :class="[itemClass(w.id), { 'currency-widget-shell': w.type === 'currency' }]"
       :style="gridStyle(w.gridX, w.gridY, w.gridW, w.gridH)"
       @pointerdown="onWidgetPointerDown($event, w.id, w.gridX, w.gridY, w.gridW, w.gridH)">
       <button class="item-del" @click.stop="store.removeWidget(w.id)" title="Remove">
@@ -864,6 +900,11 @@ onUnmounted(() => {
 /* ── Widget items ──────────────────────────────────────────── */
 .widget-item {
   overflow: hidden;
+}
+
+.currency-widget-shell {
+  border-radius: 20px;
+  isolation: isolate;
 }
 
 .search-widget-shell {
