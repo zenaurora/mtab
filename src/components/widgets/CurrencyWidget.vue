@@ -186,6 +186,7 @@ onMounted(() => void loadRate())
 .currency-widget {
   --cny-marker: #d96a5c;
   --quote-marker: #5f9b7b;
+  color-scheme: dark;
   position: relative;
   width: 100%;
   height: 100%;
@@ -202,6 +203,10 @@ onMounted(() => void loadRate())
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.055);
   user-select: none;
+}
+
+:global(.light) .currency-widget {
+  color-scheme: light;
 }
 
 .currency-widget::after {
@@ -324,18 +329,51 @@ h3 {
 
 .currency-picker { gap: 6px; min-width: 0; }
 
-.currency-select-wrap { flex: 1; min-width: 0; }
+.currency-select-wrap {
+  position: relative;
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+.currency-select-wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--text-secondary);
+  pointer-events: none;
+  transform: translateY(-70%) rotate(45deg);
+}
 
 select {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   padding: 5px 24px 5px 8px;
   border: 0;
   border-radius: 7px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   background: var(--bg-glass);
-  font-size: 10px;
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI',
+    'Microsoft YaHei', var(--font);
+  font-size: 11px;
   font-weight: 600;
+  line-height: 1.4;
   cursor: pointer;
+}
+
+select option {
+  color: var(--text-primary);
+  background-color: var(--wallpaper-background);
+  font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI',
+    'Microsoft YaHei', var(--font);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .amount-input {
