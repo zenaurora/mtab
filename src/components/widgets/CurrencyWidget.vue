@@ -12,9 +12,9 @@ import {
 } from '../../exchange/exchangeRate'
 
 const store = useSettingsStore()
-const baseAmount = ref('100')
-const quoteAmount = ref('')
-const activeSide = ref<'base' | 'quote'>('base')
+const converter = store.data.currencyConverter
+const baseAmount = ref(converter.inputSide === 'base' ? converter.inputAmount : '')
+const quoteAmount = ref(converter.inputSide === 'quote' ? converter.inputAmount : '')
 const snapshot = ref<ExchangeRateSnapshot | null>(null)
 const isLoading = ref(false)
 const errorMessage = ref('')
@@ -47,14 +47,14 @@ function syncFromQuote() {
 }
 
 function onBaseInput(event: Event) {
-  activeSide.value = 'base'
   baseAmount.value = (event.target as HTMLInputElement).value
+  store.setCurrencyInput('base', baseAmount.value)
   syncFromBase()
 }
 
 function onQuoteInput(event: Event) {
-  activeSide.value = 'quote'
   quoteAmount.value = (event.target as HTMLInputElement).value
+  store.setCurrencyInput('quote', quoteAmount.value)
   syncFromQuote()
 }
 
@@ -66,7 +66,7 @@ async function loadRate(force = false) {
     const result = await fetchExchangeRate(baseCurrency.value, quoteCurrency.value, fetch, force)
     if (id !== requestId) return
     snapshot.value = result
-    if (activeSide.value === 'base') syncFromBase()
+    if (store.data.currencyConverter.inputSide === 'base') syncFromBase()
     else syncFromQuote()
   } catch (error) {
     if (id !== requestId) return

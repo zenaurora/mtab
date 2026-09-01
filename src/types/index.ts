@@ -112,6 +112,8 @@ export interface Settings {
   currencyConverter: {
     baseCurrency: CurrencyCode
     quoteCurrency: CurrencyCode
+    inputSide: 'base' | 'quote'
+    inputAmount: string
   }
 }
 

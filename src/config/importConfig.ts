@@ -5,6 +5,7 @@ import { SUPPORTED_CURRENCY_CODES } from '../exchange/exchangeRate'
 
 const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks', 'currency'])
 const SEARCH_POSITIONS = new Set<Settings['searchBar']['verticalPosition']>(['top', 'center', 'bottom'])
+const CURRENCY_INPUT_SIDES = new Set<Settings['currencyConverter']['inputSide']>(['base', 'quote'])
 
 export function parseImportedConfig(input: unknown, current: Settings): Settings {
   const config = expectRecord(input, 'Config')
@@ -77,6 +78,7 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
   if ('notesContent' in raw) next.notesContent = expectString(raw.notesContent, 'notesContent')
   if ('currencyConverter' in raw) {
     const converter = expectRecord(raw.currencyConverter, 'currencyConverter')
+    // Configs exported by v1.3.0-v1.3.1 contain only the currency pair.
     next.currencyConverter = {
       baseCurrency: expectMember(
         converter.baseCurrency,
@@ -88,6 +90,16 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
         SUPPORTED_CURRENCY_CODES,
         'currencyConverter.quoteCurrency',
       ),
+      inputSide: converter.inputSide === undefined
+        ? 'base'
+        : expectMember(
+            converter.inputSide,
+            CURRENCY_INPUT_SIDES,
+            'currencyConverter.inputSide',
+          ),
+      inputAmount: converter.inputAmount === undefined
+        ? '1'
+        : expectString(converter.inputAmount, 'currencyConverter.inputAmount'),
     }
     if (next.currencyConverter.baseCurrency === next.currencyConverter.quoteCurrency) {
       throw new Error('currencyConverter currencies must be different')

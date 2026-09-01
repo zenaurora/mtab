@@ -113,8 +113,10 @@ const DEFAULT_SETTINGS: Settings = {
   addButtonGridY: 7,
   notesContent: '',
   currencyConverter: {
-    baseCurrency: 'CNY',
-    quoteCurrency: 'USD',
+    baseCurrency: 'USD',
+    quoteCurrency: 'CNY',
+    inputSide: 'base',
+    inputAmount: '1',
   },
 }
 
@@ -198,6 +200,29 @@ function decodeSettings(value: unknown, onMigration: () => void): Settings | und
       !isSupportedCurrencyCode(converter.baseCurrency) ||
       !isSupportedCurrencyCode(converter.quoteCurrency) ||
       converter.baseCurrency === converter.quoteCurrency
+    ) {
+      return undefined
+    }
+
+    // v1.3.0-v1.3.1 persisted only the pair. Preserve custom pairs while
+    // replacing that release's exact default with the current default.
+    const hasLegacyConverterShape =
+      converter.inputSide === undefined && converter.inputAmount === undefined
+    if (hasLegacyConverterShape) {
+      const usedOldDefault = converter.baseCurrency === 'CNY' && converter.quoteCurrency === 'USD'
+      normalized = {
+        ...normalized,
+        currencyConverter: {
+          baseCurrency: usedOldDefault ? 'USD' : converter.baseCurrency,
+          quoteCurrency: usedOldDefault ? 'CNY' : converter.quoteCurrency,
+          inputSide: 'base',
+          inputAmount: '1',
+        },
+      }
+      migrated = true
+    } else if (
+      (converter.inputSide !== 'base' && converter.inputSide !== 'quote') ||
+      typeof converter.inputAmount !== 'string'
     ) {
       return undefined
     }
@@ -408,6 +433,13 @@ export const useSettingsStore = defineStore('settings', () => {
     if (baseCurrency === quoteCurrency) return
     data.value.currencyConverter.baseCurrency = baseCurrency
     data.value.currencyConverter.quoteCurrency = quoteCurrency
+    void save()
+  }
+
+  function setCurrencyInput(inputSide: 'base' | 'quote', inputAmount: string) {
+    data.value.currencyConverter.inputSide = inputSide
+    data.value.currencyConverter.inputAmount = inputAmount
+    void save()
   }
 
   function moveBookmarks(patches: Array<{ id: string; gridX: number; gridY: number }>) {
@@ -575,6 +607,7 @@ export const useSettingsStore = defineStore('settings', () => {
     removeWidget,
     moveWidget,
     setCurrencyPair,
+    setCurrencyInput,
     // bookmarks
     addBookmark,
     updateBookmark,

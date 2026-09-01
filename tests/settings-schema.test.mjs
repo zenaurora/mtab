@@ -104,6 +104,76 @@ test('currency converter is present on a new desktop by default', async () => {
   }
 })
 
+test('currency converter defaults, persists state, and migrates the former default', async () => {
+  setActivePinia(createPinia())
+  let storedValue = null
+  globalThis.localStorage = {
+    getItem() {
+      return storedValue
+    },
+    setItem(_key, value) {
+      storedValue = value
+    },
+    removeItem() {},
+  }
+  const server = await createServer({
+    appType: 'custom',
+    server: { hmr: false, middlewareMode: true, ws: false },
+  })
+
+  try {
+    const { useSettingsStore } = await server.ssrLoadModule('/src/stores/settings.ts')
+    const firstPage = useSettingsStore()
+    await firstPage.load()
+
+    assert.deepEqual(firstPage.data.currencyConverter, {
+      baseCurrency: 'USD',
+      quoteCurrency: 'CNY',
+      inputSide: 'base',
+      inputAmount: '1',
+    })
+
+    firstPage.setCurrencyPair('EUR', 'JPY')
+    firstPage.setCurrencyInput('quote', '2500')
+    await firstPage.save()
+
+    setActivePinia(createPinia())
+    const nextPage = useSettingsStore()
+    await nextPage.load()
+
+    assert.deepEqual(nextPage.data.currencyConverter, {
+      baseCurrency: 'EUR',
+      quoteCurrency: 'JPY',
+      inputSide: 'quote',
+      inputAmount: '2500',
+    })
+
+    const legacySettings = nextPage.exportConfig().settings
+    legacySettings.currencyConverter = {
+      baseCurrency: 'CNY',
+      quoteCurrency: 'USD',
+    }
+    storedValue = JSON.stringify(legacySettings)
+
+    setActivePinia(createPinia())
+    const migratedStore = useSettingsStore()
+    await migratedStore.load()
+
+    assert.deepEqual(migratedStore.data.currencyConverter, {
+      baseCurrency: 'USD',
+      quoteCurrency: 'CNY',
+      inputSide: 'base',
+      inputAmount: '1',
+    })
+    assert.deepEqual(
+      JSON.parse(storedValue).currencyConverter,
+      migratedStore.data.currencyConverter,
+    )
+  } finally {
+    await server.close()
+  }
+})
+
 test('valid settings from before icon-area controls are migrated and persisted', async () => {
   setActivePinia(createPinia())
   let storedValue = null
