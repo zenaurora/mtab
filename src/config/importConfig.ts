@@ -3,7 +3,14 @@ import { THEME_IDS } from '../themes'
 import { ICON_AREA_MAX_INSET_PERCENT } from '../layout/iconArea'
 import { SUPPORTED_CURRENCY_CODES } from '../exchange/exchangeRate'
 
-const WIDGET_TYPES = new Set<WidgetType>(['clock', 'date', 'notes', 'bookmarks', 'currency'])
+const WIDGET_TYPES = new Set<WidgetType>([
+  'clock',
+  'date',
+  'notes',
+  'bookmarks',
+  'currency',
+  'read-later',
+])
 const SEARCH_POSITIONS = new Set<Settings['searchBar']['verticalPosition']>(['top', 'center', 'bottom'])
 const CURRENCY_INPUT_SIDES = new Set<Settings['currencyConverter']['inputSide']>(['base', 'quote'])
 
@@ -62,6 +69,12 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
     next.performanceMode = expectBoolean(raw.performanceMode, 'performanceMode')
   }
   if ('widgets' in raw) next.widgets = parseWidgets(raw.widgets)
+  if ('readLaterWidgetIntroduced' in raw) {
+    next.readLaterWidgetIntroduced = expectBoolean(
+      raw.readLaterWidgetIntroduced,
+      'readLaterWidgetIntroduced',
+    )
+  }
   if ('bookmarks' in raw) next.bookmarks = parseBookmarks(raw.bookmarks)
   if ('showBrowserBookmarkBar' in raw) {
     next.showBrowserBookmarkBar = expectBoolean(raw.showBrowserBookmarkBar, 'showBrowserBookmarkBar')
@@ -70,7 +83,7 @@ export function parseImportedConfig(input: unknown, current: Settings): Settings
     next.showAddButton = expectBoolean(raw.showAddButton, 'showAddButton')
   }
   if ('addButtonGridX' in raw) {
-    next.addButtonGridX = expectInteger(raw.addButtonGridX, 'addButtonGridX')
+    next.addButtonGridX = expectInteger(raw.addButtonGridX, 'addButtonGridX', 0)
   }
   if ('addButtonGridY' in raw) {
     next.addButtonGridY = expectInteger(raw.addButtonGridY, 'addButtonGridY', 0)
@@ -146,8 +159,14 @@ function parseWidgets(value: unknown): Widget[] {
       type,
       gridX: expectInteger(widget.gridX, `widgets[${index}].gridX`, 0),
       gridY: expectInteger(widget.gridY, `widgets[${index}].gridY`, 0),
-      gridW: type === 'currency' ? 3 : expectInteger(widget.gridW, `widgets[${index}].gridW`, 1),
-      gridH: type === 'currency' ? 3 : expectInteger(widget.gridH, `widgets[${index}].gridH`, 1),
+      gridW: type === 'currency'
+        ? 3
+        : type === 'read-later'
+          ? 4
+          : expectInteger(widget.gridW, `widgets[${index}].gridW`, 1),
+      gridH: type === 'currency' || type === 'read-later'
+        ? 3
+        : expectInteger(widget.gridH, `widgets[${index}].gridH`, 1),
     }
   })
   assertUniqueIds(widgets, 'widgets')
@@ -162,7 +181,7 @@ function parseBookmarks(value: unknown): Bookmark[] {
       id: expectString(bookmark.id, `bookmarks[${index}].id`, true),
       name: expectString(bookmark.name, `bookmarks[${index}].name`),
       url: expectString(bookmark.url, `bookmarks[${index}].url`, true),
-      gridX: expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`),
+      gridX: expectInteger(bookmark.gridX, `bookmarks[${index}].gridX`, 0),
       gridY: expectInteger(bookmark.gridY, `bookmarks[${index}].gridY`, 0),
     }
     if (bookmark.iconUrl !== undefined) {

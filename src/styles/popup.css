@@ -1,0 +1,13 @@
+html,
+body,
+#app {
+  width: 380px;
+  min-height: 240px;
+  height: auto;
+  overflow: hidden;
+}
+
+body {
+  color-scheme: dark;
+  background: #121315;
+}

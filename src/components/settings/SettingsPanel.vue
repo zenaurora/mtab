@@ -43,6 +43,7 @@ const widgetTypes: { type: WidgetType; label: string; desc: string }[] = [
   { type: 'notes', label: 'Notes', desc: 'Quick memo pad' },
   { type: 'bookmarks', label: 'Bookmarks', desc: 'Website shortcuts grid' },
   { type: 'currency', label: 'Currency', desc: 'Live rates and converter' },
+  { type: 'read-later', label: 'Read Later', desc: 'Pages you want to finish' },
 ]
 </script>
 

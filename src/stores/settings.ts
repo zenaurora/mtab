@@ -98,6 +98,14 @@ const DEFAULT_SETTINGS: Settings = {
   performanceMode: false,
   widgets: [
     {
+      id: 'widget_read_later_default',
+      type: 'read-later',
+      gridX: 0,
+      gridY: 3,
+      gridW: 4,
+      gridH: 3,
+    },
+    {
       id: 'widget_currency_default',
       type: 'currency',
       gridX: 0,
@@ -106,6 +114,7 @@ const DEFAULT_SETTINGS: Settings = {
       gridH: 3,
     },
   ],
+  readLaterWidgetIntroduced: true,
   bookmarks: DEFAULT_BOOKMARKS,
   showBrowserBookmarkBar: true,
   showAddButton: true,
@@ -129,6 +138,7 @@ const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
   notes: { gridW: 3, gridH: 3 },
   bookmarks: { gridW: 3, gridH: 2 },
   currency: { gridW: 3, gridH: 3 },
+  'read-later': { gridW: 4, gridH: 3 },
 }
 const WIDGET_TYPES = new Set(Object.keys(WIDGET_SIZES))
 
@@ -143,17 +153,25 @@ function decodeSettings(value: unknown, onMigration: () => void): Settings | und
     !['top', 'center', 'bottom'].includes(String(search.verticalPosition)) ||
     typeof search.offsetY !== 'number' ||
     !Array.isArray(settings.widgets) ||
-    settings.widgets.some((widget) =>
-      !widget ||
-      typeof widget !== 'object' ||
-      !WIDGET_TYPES.has(String((widget as Record<string, unknown>).type)),
-    ) ||
+    settings.widgets.some((widget) => {
+      if (!widget || typeof widget !== 'object' || Array.isArray(widget)) return true
+      const item = widget as Record<string, unknown>
+      return (
+        !WIDGET_TYPES.has(String(item.type)) ||
+        !Number.isInteger(item.gridX) ||
+        !Number.isInteger(item.gridY) ||
+        !Number.isInteger(item.gridW) ||
+        !Number.isInteger(item.gridH)
+      )
+    }) ||
     !Array.isArray(settings.bookmarks) ||
     settings.bookmarks.some((bookmark) => {
       if (!bookmark || typeof bookmark !== 'object') return true
       const item = bookmark as Record<string, unknown>
       return !Number.isInteger(item.gridX) || !Number.isInteger(item.gridY)
-    })
+    }) ||
+    !Number.isInteger(settings.addButtonGridX) ||
+    !Number.isInteger(settings.addButtonGridY)
   ) {
     return undefined
   }
@@ -238,6 +256,45 @@ function decodeSettings(value: unknown, onMigration: () => void): Settings | und
       widgets: storedWidgets.map((widget) =>
         widget.type === 'currency' ? { ...widget, gridW: 3, gridH: 3 } : widget,
       ),
+    }
+    migrated = true
+  }
+
+  // Introduce the queue once for existing installations. Keeping the marker
+  // separate from widget presence means removing the widget remains respected.
+  if (settings.readLaterWidgetIntroduced === undefined) {
+    normalized = {
+      ...normalized,
+      readLaterWidgetIntroduced: true,
+      widgets: normalized.widgets.some((widget) => widget.type === 'read-later')
+        ? normalized.widgets
+        : [{ ...DEFAULT_SETTINGS.widgets[0] }, ...normalized.widgets],
+    }
+    migrated = true
+  } else if (typeof settings.readLaterWidgetIntroduced !== 'boolean') {
+    return undefined
+  }
+
+  const hasNegativeLayoutPosition =
+    normalized.widgets.some((widget) => widget.gridX < 0 || widget.gridY < 0) ||
+    normalized.bookmarks.some((bookmark) => bookmark.gridX < 0 || bookmark.gridY < 0) ||
+    normalized.addButtonGridX < 0 ||
+    normalized.addButtonGridY < 0
+  if (hasNegativeLayoutPosition) {
+    normalized = {
+      ...normalized,
+      widgets: normalized.widgets.map((widget) => ({
+        ...widget,
+        gridX: Math.max(0, widget.gridX),
+        gridY: Math.max(0, widget.gridY),
+      })),
+      bookmarks: normalized.bookmarks.map((bookmark) => ({
+        ...bookmark,
+        gridX: Math.max(0, bookmark.gridX),
+        gridY: Math.max(0, bookmark.gridY),
+      })),
+      addButtonGridX: Math.max(0, normalized.addButtonGridX),
+      addButtonGridY: Math.max(0, normalized.addButtonGridY),
     }
     migrated = true
   }
@@ -448,13 +505,13 @@ export const useSettingsStore = defineStore('settings', () => {
     for (const patch of patches) {
       const bm = byId.get(patch.id)
       if (!bm) continue
-      bm.gridX = patch.gridX
+      bm.gridX = Math.max(0, patch.gridX)
       bm.gridY = Math.max(0, patch.gridY)
     }
   }
 
   function moveAddButton(gridX: number, gridY: number) {
-    data.value.addButtonGridX = gridX
+    data.value.addButtonGridX = Math.max(0, gridX)
     data.value.addButtonGridY = Math.max(0, gridY)
   }
 
@@ -471,7 +528,7 @@ export const useSettingsStore = defineStore('settings', () => {
     bookmark: Omit<Bookmark, 'id' | 'gridX' | 'gridY'> & Partial<Pick<Bookmark, 'gridX' | 'gridY'>>,
   ) {
     const pos = bookmark.gridX !== undefined
-      ? { gridX: bookmark.gridX, gridY: bookmark.gridY ?? 6 }
+      ? { gridX: Math.max(0, bookmark.gridX), gridY: Math.max(0, bookmark.gridY ?? 6) }
       : findFreePosition(1, 1, 6)
     const newBookmark: Bookmark = {
       ...bookmark,
@@ -484,7 +541,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function updateBookmark(id: string, patch: Partial<Bookmark>) {
     const bm = data.value.bookmarks.find((b) => b.id === id)
-    if (bm) Object.assign(bm, patch)
+    if (!bm) return
+    Object.assign(bm, patch)
+    bm.gridX = Math.max(0, bm.gridX)
+    bm.gridY = Math.max(0, bm.gridY)
   }
 
   function removeBookmark(id: string) {

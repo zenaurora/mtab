@@ -8,6 +8,7 @@ import NotesWidget from './widgets/NotesWidget.vue'
 import SearchWidget from './widgets/SearchWidget.vue'
 import BookmarkWidget from './widgets/BookmarkWidget.vue'
 import CurrencyWidget from './widgets/CurrencyWidget.vue'
+import ReadLaterWidget from './widgets/ReadLaterWidget.vue'
 import BookmarkIcon from './BookmarkIcon.vue'
 import BookmarkEditorModal from './BookmarkEditorModal.vue'
 import {
@@ -27,6 +28,7 @@ import {
   type BlockerDropPlan,
 } from '../layout/gridLayout'
 import { calculateIconAreaLayout } from '../layout/iconArea'
+import { createCanvasGrid } from '../layout/canvasGrid'
 
 const store = useSettingsStore()
 defineProps<{ showIconAreaGuide?: boolean }>()
@@ -101,24 +103,17 @@ const canvasInsets = computed(() => {
   }
 })
 
-const canvasOffset = computed(() => {
-  const cell = cellSize.value
-  const defaultStartX = 4
-  const defaultStartY = 6
-  const defaultCols = viewportWidth.value < 900 ? 4 : 8
-  const defaultRows = 3
-  const layoutW = defaultCols * cell
-  const layoutH = defaultRows * cell
-
-  return {
-    x:
-      Math.max(canvasInsets.value.horizontal, Math.floor((viewportWidth.value - layoutW) / 2)) -
-      defaultStartX * cell,
-    y:
-      Math.max(canvasInsets.value.top, Math.floor((viewportHeight.value - layoutH) / 2)) -
-      defaultStartY * cell,
-  }
-})
+const canvasGrid = computed(() => createCanvasGrid({
+  viewportWidth: viewportWidth.value,
+  viewportHeight: viewportHeight.value,
+  cellSize: cellSize.value,
+  padding: {
+    left: canvasInsets.value.horizontal,
+    right: canvasInsets.value.horizontal,
+    top: canvasInsets.value.top,
+    bottom: canvasInsets.value.bottom,
+  },
+}))
 
 // The search widget lives on the same grid as icons and other widgets. Its
 // footprint is derived from the user's width/position/offset settings, then
@@ -154,14 +149,7 @@ function clampNumber(value: number, min: number, max: number) {
 }
 
 function gridBounds(gridW = 1, gridH = 1) {
-  const cell = cellSize.value
-  const offset = canvasOffset.value
-  const minX = Math.max(0, Math.ceil(-offset.x / cell))
-  const minY = Math.max(0, Math.ceil(-offset.y / cell))
-  const maxX = Math.max(minX, Math.floor((viewportWidth.value - offset.x - gridW * cell) / cell))
-  const maxY = Math.max(minY, Math.floor((viewportHeight.value - offset.y - gridH * cell) / cell))
-
-  return { minX, minY, maxX, maxY }
+  return canvasGrid.value.boundsFor({ gridW, gridH })
 }
 
 const iconAreaLayout = computed(() => calculateIconAreaLayout({
@@ -174,8 +162,8 @@ const iconAreaLayout = computed(() => calculateIconAreaLayout({
   },
   grid: {
     cellSize: cellSize.value,
-    offsetX: canvasOffset.value.x,
-    offsetY: canvasOffset.value.y,
+    originX: canvasGrid.value.origin.x,
+    originY: canvasGrid.value.origin.y,
   },
   insets: store.data.iconArea,
   requiredCells: store.data.bookmarks.length + (store.data.showAddButton ? 1 : 0),
@@ -185,11 +173,7 @@ const iconAreaLayout = computed(() => calculateIconAreaLayout({
 const iconGridBounds = computed<GridBounds>(() => iconAreaLayout.value.gridBounds)
 
 function clampGridPosition(gridX: number, gridY: number, gridW = 1, gridH = 1) {
-  const bounds = gridBounds(gridW, gridH)
-  return {
-    gridX: clampNumber(gridX, bounds.minX, bounds.maxX),
-    gridY: clampNumber(gridY, bounds.minY, bounds.maxY),
-  }
+  return canvasGrid.value.clamp({ gridX, gridY }, { gridW, gridH })
 }
 
 function clampIconGridPosition(gridX: number, gridY: number) {
@@ -207,14 +191,14 @@ function positionedGridStyle(
   gridH: number,
 ) {
   const cell = cellSize.value
-  const offset = canvasOffset.value
+  const pixel = canvasGrid.value.toPixels({ gridX, gridY })
   return {
     position: 'absolute' as const,
     left: '0',
     top: '0',
     width: `${gridW * cell}px`,
     height: `${gridH * cell}px`,
-    transform: `translate3d(${offset.x + gridX * cell}px, ${offset.y + gridY * cell}px, 0)`,
+    transform: `translate3d(${pixel.x}px, ${pixel.y}px, 0)`,
   }
 }
 
@@ -293,16 +277,16 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
   if (!el) return
 
   const cell = cellSize.value
-  const offset = canvasOffset.value
   const gridW = Math.max(1, Math.ceil((dragW.value || cell) / cell))
   const gridH = Math.max(1, Math.ceil((dragH.value || cell) / cell))
   const pos = dragKind.value === 'icon'
     ? clampIconGridPosition(col, row)
     : clampGridPosition(col, row, gridW, gridH)
+  const pixel = canvasGrid.value.toPixels(pos)
 
   el.style.width = `${dragW.value || cell}px`
   el.style.height = `${dragH.value || cell}px`
-  el.style.transform = `translate3d(${offset.x + pos.gridX * cell}px, ${offset.y + pos.gridY * cell}px, 0)`
+  el.style.transform = `translate3d(${pixel.x}px, ${pixel.y}px, 0)`
   el.style.borderColor = occupied ? 'rgba(239, 68, 68, 0.6)' : 'var(--accent)'
   el.style.background = occupied
     ? 'rgba(239, 68, 68, 0.06)'
@@ -311,14 +295,12 @@ function updateDropIndicatorDom(col: number, row: number, occupied: boolean) {
 
 function pointerToGrid(x: number, y: number) {
   const cell = cellSize.value
-  const offset = canvasOffset.value
   const gridW = Math.max(1, Math.ceil((dragW.value || cell) / cell))
   const gridH = Math.max(1, Math.ceil((dragH.value || cell) / cell))
-  const gridX = Math.round((x - offset.x + dragW.value / 2 - cell / 2) / cell)
-  const gridY = Math.round((y - offset.y + dragH.value / 2 - cell / 2) / cell)
+  const position = canvasGrid.value.snapPixels({ x, y }, { gridW, gridH })
   return dragKind.value === 'icon'
-    ? clampIconGridPosition(gridX, gridY)
-    : clampGridPosition(gridX, gridY, gridW, gridH)
+    ? clampIconGridPosition(position.gridX, position.gridY)
+    : position
 }
 
 let layoutClampRaf = 0
@@ -718,6 +700,7 @@ const componentMap: Record<WidgetType, typeof ClockWidget> = {
   notes: NotesWidget,
   bookmarks: BookmarkWidget,
   currency: CurrencyWidget,
+  'read-later': ReadLaterWidget,
 }
 
 watch(

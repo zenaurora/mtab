@@ -21,8 +21,8 @@ export type IconAreaLayoutInput = {
   }
   grid: {
     cellSize: number
-    offsetX: number
-    offsetY: number
+    originX: number
+    originY: number
   }
   insets: {
     leftPercent: number
@@ -141,18 +141,18 @@ function gridBoundsWithin(
   frame: IconAreaFrame,
   grid: IconAreaLayoutInput['grid'],
 ): GridBounds {
-  const { cellSize, offsetX, offsetY } = grid
-  let minX = Math.ceil((frame.left - offsetX) / cellSize)
-  let maxX = Math.floor((frame.right - offsetX - cellSize) / cellSize)
-  let minY = Math.ceil((frame.top - offsetY) / cellSize)
-  let maxY = Math.floor((frame.bottom - offsetY - cellSize) / cellSize)
+  const { cellSize, originX, originY } = grid
+  let minX = Math.max(0, Math.ceil((frame.left - originX) / cellSize))
+  let maxX = Math.max(0, Math.floor((frame.right - originX - cellSize) / cellSize))
+  let minY = Math.max(0, Math.ceil((frame.top - originY) / cellSize))
+  let maxY = Math.max(0, Math.floor((frame.bottom - originY - cellSize) / cellSize))
 
   if (minX > maxX) {
-    minX = Math.round(((frame.left + frame.right - cellSize) / 2 - offsetX) / cellSize)
+    minX = Math.max(0, Math.round(((frame.left + frame.right - cellSize) / 2 - originX) / cellSize))
     maxX = minX
   }
   if (minY > maxY) {
-    minY = Math.round(((frame.top + frame.bottom - cellSize) / 2 - offsetY) / cellSize)
+    minY = Math.max(0, Math.round(((frame.top + frame.bottom - cellSize) / 2 - originY) / cellSize))
     maxY = minY
   }
   return { minX, minY, maxX, maxY }
@@ -180,8 +180,8 @@ function frameContainingGrid(
   grid: IconAreaLayoutInput['grid'],
   limit: IconAreaFrame,
 ): IconAreaFrame {
-  const gridLeft = grid.offsetX + bounds.minX * grid.cellSize
-  const gridRight = grid.offsetX + (bounds.maxX + 1) * grid.cellSize
+  const gridLeft = grid.originX + bounds.minX * grid.cellSize
+  const gridRight = grid.originX + (bounds.maxX + 1) * grid.cellSize
   const left = Math.max(limit.left, Math.min(requested.left, gridLeft))
   const right = Math.min(limit.right, Math.max(requested.right, gridRight))
   return {

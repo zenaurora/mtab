@@ -11,7 +11,7 @@ export interface SearchEngine {
 }
 
 // Widget types
-export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks' | 'currency'
+export type WidgetType = 'clock' | 'date' | 'notes' | 'bookmarks' | 'currency' | 'read-later'
 
 export type CurrencyCode =
   | 'CNY'
@@ -29,7 +29,7 @@ export type CurrencyCode =
 export interface Widget {
   id: string
   type: WidgetType
-  // Snap-to-grid position (in grid cells, not pixels)
+  // Non-negative position from the canvas's top-left cell (not pixels)
   gridX: number   // column index (0-based)
   gridY: number   // row index (0-based)
   // Fixed size per widget type (in grid cells)
@@ -43,8 +43,27 @@ export interface Bookmark {
   name: string
   url: string
   iconUrl?: string
-  gridX: number   // signed column index on the centered desktop grid
+  gridX: number   // non-negative column index from the canvas's left edge
   gridY: number   // row index (0-based)
+}
+
+// A short-lived reading queue. Unlike bookmarks, these entries are expected to
+// leave the list once the user has finished them.
+export interface ReadLaterItem {
+  id: string
+  title: string
+  url: string
+  iconUrl?: string
+  savedAt: string
+}
+
+export interface OpenTabCandidate {
+  id: number
+  title: string
+  url: string
+  iconUrl?: string
+  active: boolean
+  lastAccessed: number
 }
 
 // Wallpaper history entry
@@ -93,6 +112,9 @@ export interface Settings {
 
   // Widgets
   widgets: Widget[]
+  // Prevents the default Read Later widget from being re-added after a user
+  // intentionally removes it. Missing on settings saved before the feature.
+  readLaterWidgetIntroduced: boolean
 
   // Bookmarks
   bookmarks: Bookmark[]

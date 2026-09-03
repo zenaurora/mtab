@@ -241,6 +241,24 @@ test('drag plans use the effective icon area at both horizontal edges', async ()
   assert.equal(rightPlan.patches.at(-1).gridX, canvas.iconGridBounds.value.maxX)
 })
 
+test('large widgets snap to both edges using non-negative coordinates', async () => {
+  const canvas = await loadDesktopCanvasSetup()
+  const bounds = canvas.gridBounds(4, 3)
+  const grid = canvas.canvasGrid.value
+  canvas.dragKind.value = 'widget'
+  canvas.dragW.value = 4 * canvas.cellSize.value
+  canvas.dragH.value = 3 * canvas.cellSize.value
+
+  assert.deepEqual(canvas.pointerToGrid(grid.origin.x, grid.origin.y), {
+    gridX: 0,
+    gridY: 0,
+  })
+  assert.deepEqual(canvas.pointerToGrid(10_000, 10_000), {
+    gridX: bounds.maxX,
+    gridY: bounds.maxY,
+  })
+})
+
 test('the icon-area guide renders above settings without intercepting input', async () => {
   const source = await readFile(
     new URL('../src/components/DesktopCanvas.vue', import.meta.url),

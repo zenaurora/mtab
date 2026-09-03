@@ -25,8 +25,8 @@ function baseInput(overrides = {}) {
     },
     grid: {
       cellSize: 76,
-      offsetX: 112,
-      offsetY: -120,
+      originX: 36,
+      originY: 79,
     },
     insets: { leftPercent: 0, rightPercent: 0 },
     requiredCells: 1,
@@ -35,16 +35,16 @@ function baseInput(overrides = {}) {
   }
 }
 
-test('pixel frame stays symmetric while its internal grid may use signed columns', async () => {
+test('pixel frame and its grid both use a non-negative left origin', async () => {
   const { calculateIconAreaLayout } = await loadIconAreaModule()
   const layout = calculateIconAreaLayout(baseInput())
 
   assert.equal(layout.frame.left, 24)
   assert.equal(1440 - layout.frame.right, 24)
-  assert.equal(layout.gridBounds.minX, -1)
+  assert.equal(layout.gridBounds.minX, 0)
 
-  const gridLeft = 112 + layout.gridBounds.minX * 76
-  const gridRight = 112 + (layout.gridBounds.maxX + 1) * 76
+  const gridLeft = 36 + layout.gridBounds.minX * 76
+  const gridRight = 36 + (layout.gridBounds.maxX + 1) * 76
   assert.ok(gridLeft >= layout.frame.left)
   assert.ok(gridRight <= layout.frame.right)
 })
