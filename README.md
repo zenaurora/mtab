@@ -1,6 +1,6 @@
 # mtab
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](README.md) | [简体中文](README.zh-CN.md) | [Fix history](CHANGELOG.md) | [Open issues](docs/open-issues.md) | [Code techniques](docs/code-techniques.md)
 
 A customizable new tab page for Chrome and Microsoft Edge.
 

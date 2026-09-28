@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 import BookmarkFolderMenu, { type BookmarkMenuItem } from './BookmarkFolderMenu.vue'
 import { extractDomain } from '../utils/url'
+import { navigateAfterSavingSettings } from '../utils/navigation'
 
 const store = useSettingsStore()
 
@@ -147,7 +148,7 @@ function openBookmark(item: BookmarkMenuItem) {
   if (!item.url) return
   openFolderId.value = null
   moreMenuOpen.value = false
-  window.location.href = item.url
+  void navigateAfterSavingSettings(item.url)
 }
 
 function toggleFolder(item: BookmarkMenuItem) {

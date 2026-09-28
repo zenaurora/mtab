@@ -1,6 +1,6 @@
 # mtab
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[English](README.md) | [简体中文](README.zh-CN.md) | [修复记录](CHANGELOG.md) | [待改进问题](docs/open-issues.md) | [代码技巧](docs/code-techniques.md)
 
 一款适用于 Chrome 和 Microsoft Edge 的可自定义新标签页扩展。
 

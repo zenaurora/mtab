@@ -13,6 +13,7 @@ export function useStorage<T>(
   key: string,
   defaultValue: T,
   decodeValue: (value: unknown) => T | undefined,
+  options: { autoSave?: boolean } = {},
 ): {
   data: Ref<T>
   ready: Ref<boolean>
@@ -32,14 +33,14 @@ export function useStorage<T>(
         if (result[key] !== undefined) {
           const decoded = decodeValue(result[key])
           if (decoded !== undefined) data.value = cloneValue(decoded)
-          else await persistCurrentValue()
+          else if (options.autoSave !== false) await persistCurrentValue()
         }
       } else {
         const stored = localStorage.getItem(key)
         if (stored !== null) {
           const decoded = decodeValue(JSON.parse(stored))
           if (decoded !== undefined) data.value = cloneValue(decoded)
-          else await persistCurrentValue()
+          else if (options.autoSave !== false) await persistCurrentValue()
         }
       }
     } catch (e) {
@@ -99,7 +100,7 @@ export function useStorage<T>(
   watch(
     data,
     () => {
-      if (!ready.value) return
+      if (!ready.value || options.autoSave === false) return
       if (saveTimer) clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {
         saveTimer = null

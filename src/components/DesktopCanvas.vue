@@ -29,6 +29,7 @@ import {
 } from '../layout/gridLayout'
 import { calculateIconAreaLayout } from '../layout/iconArea'
 import { createCanvasGrid } from '../layout/canvasGrid'
+import { navigateAfterSavingSettings } from '../utils/navigation'
 
 const store = useSettingsStore()
 defineProps<{ showIconAreaGuide?: boolean }>()
@@ -621,7 +622,7 @@ function onPointerUp() {
   if (pendingDrag && !isDragging.value) {
     if (dragKind.value === 'icon' && draggingId.value && draggingId.value !== ADD_BTN_ID && !justDragged) {
       const bm = store.data.bookmarks.find((b) => b.id === draggingId.value)
-      if (bm) window.location.href = bm.url
+      if (bm) void navigateAfterSavingSettings(bm.url)
     }
     resetDrag()
     return

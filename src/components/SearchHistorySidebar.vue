@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { stripWwwHostname } from '../utils/url'
+import { navigateAfterSavingSettings } from '../utils/navigation'
 
 type ChromeSearchItem = {
   id: string
@@ -116,7 +117,7 @@ function toggleExpanded() {
 }
 
 function runSearch(item: ChromeSearchItem) {
-  window.location.href = item.searchUrl
+  void navigateAfterSavingSettings(item.searchUrl)
 }
 
 function formatTime(value: number) {

@@ -5,6 +5,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createServer } from 'vite'
 
 async function loadSearchWidgetSetup() {
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+  }
   const pinia = createPinia()
   setActivePinia(pinia)
 
@@ -43,6 +48,8 @@ test('Enter submits after IME composition has finished', async () => {
   widget.query.value = '中文'
 
   widget.onKeydown({ key: 'Enter', isComposing: false })
+
+  await new Promise((resolve) => setImmediate(resolve))
 
   assert.equal(
     window.location.href,

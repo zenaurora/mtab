@@ -4,15 +4,10 @@ import { useStorage } from '../composables/useStorage'
 import { READ_LATER_LIMIT, READ_LATER_STORAGE_KEY } from '../readLater/model'
 import type { OpenTabCandidate, ReadLaterItem } from '../types'
 
-type CaptureResponse = {
-  ok: boolean
-  item?: ReadLaterItem
-  reason?: 'no-page' | 'unavailable'
-}
-
-type TabsResponse = {
+type ReadLaterResponse = {
   ok: boolean
   tabs?: OpenTabCandidate[]
+  item?: ReadLaterItem
   items?: ReadLaterItem[]
   reason?: 'no-page' | 'unavailable'
 }
@@ -54,6 +49,7 @@ export const useReadLaterStore = defineStore('readLater', () => {
     READ_LATER_STORAGE_KEY,
     [],
     decodeItems,
+    { autoSave: typeof chrome === 'undefined' || typeof chrome.runtime?.sendMessage !== 'function' },
   )
   let listening = false
 
@@ -79,28 +75,32 @@ export const useReadLaterStore = defineStore('readLater', () => {
     }
   }
 
-  async function sendMessage(message: object): Promise<TabsResponse> {
+  async function sendMessage(message: object): Promise<ReadLaterResponse> {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
       return { ok: false, reason: 'unavailable' }
     }
     try {
-      return await chrome.runtime.sendMessage(message) as TabsResponse
+      return await chrome.runtime.sendMessage(message) as ReadLaterResponse
     } catch {
       return { ok: false, reason: 'unavailable' }
     }
   }
 
-  async function listOpenTabs(): Promise<TabsResponse> {
+  async function listOpenTabs(): Promise<ReadLaterResponse> {
     return sendMessage({ type: 'read-later:list-tabs' })
   }
 
-  async function captureTabs(tabIds: number[]): Promise<CaptureResponse & { items?: ReadLaterItem[] }> {
+  async function captureTabs(tabIds: number[]): Promise<ReadLaterResponse> {
     if (tabIds.length === 0) return { ok: false, reason: 'no-page' }
     const response = await sendMessage({ type: 'read-later:add-tabs', tabIds })
     return response
   }
 
   async function remove(id: string): Promise<ReadLaterItem | undefined> {
+    if (typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function') {
+      const response = await sendMessage({ type: 'read-later:remove', id })
+      return response.ok ? response.item : undefined
+    }
     const index = data.value.findIndex((item) => item.id === id)
     if (index === -1) return undefined
     const [removed] = data.value.splice(index, 1)
@@ -108,10 +108,15 @@ export const useReadLaterStore = defineStore('readLater', () => {
     return removed
   }
 
-  async function restore(item: ReadLaterItem): Promise<void> {
+  async function restore(item: ReadLaterItem): Promise<boolean> {
+    if (typeof chrome !== 'undefined' && typeof chrome.runtime?.sendMessage === 'function') {
+      const response = await sendMessage({ type: 'read-later:restore', item })
+      return response.ok
+    }
     data.value = [item, ...data.value.filter((entry) => entry.url !== item.url)]
       .slice(0, READ_LATER_LIMIT)
     await save()
+    return true
   }
 
   return {

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useStorage } from '../composables/useStorage'
+import { useSettingsStorage } from '../composables/useSettingsStorage'
 import { loadLargeStorageValue, saveLargeStorageValue } from '../composables/useLargeStorage'
 import {
   createGridSnapshot,
@@ -129,7 +129,6 @@ const DEFAULT_SETTINGS: Settings = {
   },
 }
 
-const SETTINGS_KEY = 'mtab_settings'
 const WALLPAPER_BLOB_KEY = 'mtab_wallpaper_blob'
 const STORAGE_GRID: GridBounds = { minX: 0, minY: 0, maxX: 19, maxY: 29 }
 const WIDGET_SIZES: Record<WidgetType, { gridW: number; gridH: number }> = {
@@ -310,8 +309,7 @@ function genId(prefix = 'id'): string {
 
 export const useSettingsStore = defineStore('settings', () => {
   let shouldPersistDecodedSettings = false
-  const { data, load, save } = useStorage<Settings>(
-    SETTINGS_KEY,
+  const { data, load, save } = useSettingsStorage<Settings>(
     DEFAULT_SETTINGS,
     (value) => decodeSettings(value, () => {
       shouldPersistDecodedSettings = true

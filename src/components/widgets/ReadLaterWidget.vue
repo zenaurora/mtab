@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useReadLaterStore } from '../../stores/readLater'
 import type { ReadLaterItem } from '../../types'
 import { extractDomain } from '../../utils/url'
+import { navigateAfterSavingSettings } from '../../utils/navigation'
 import FaviconImage from '../FaviconImage.vue'
 import OpenTabsPicker from '../OpenTabsPicker.vue'
 
@@ -11,8 +12,6 @@ const undoneItem = ref<ReadLaterItem | null>(null)
 const showPicker = ref(false)
 let undoTimer = 0
 
-const visibleItems = computed(() => store.items.slice(0, 4))
-const remainingCount = computed(() => Math.max(0, store.items.length - visibleItems.value.length))
 
 function relativeTime(iso: string): string {
   const elapsed = Math.max(0, Date.now() - new Date(iso).getTime())
@@ -30,7 +29,7 @@ function closePickerAfterFeedback() {
 }
 
 function continueReading(item: ReadLaterItem) {
-  window.location.href = item.url
+  void navigateAfterSavingSettings(item.url)
 }
 
 async function markDone(item: ReadLaterItem) {
@@ -43,7 +42,7 @@ async function markDone(item: ReadLaterItem) {
 
 async function undoDone() {
   if (!undoneItem.value) return
-  await store.restore(undoneItem.value)
+  if (!await store.restore(undoneItem.value)) return
   undoneItem.value = null
   window.clearTimeout(undoTimer)
 }
@@ -83,7 +82,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div v-if="store.items.length" class="reading-list">
-      <article v-for="(item, index) in visibleItems" :key="item.id" class="reading-item">
+      <article v-for="(item, index) in store.items" :key="item.id" class="reading-item">
         <span class="reading-line" :class="{ newest: index === 0 }" aria-hidden="true"></span>
         <button class="page-button" type="button" :title="item.url" @click="continueReading(item)">
           <span class="favicon-wrap">
@@ -104,7 +103,6 @@ onBeforeUnmount(() => {
           </svg>
         </button>
       </article>
-      <p v-if="remainingCount" class="remaining">还有 {{ remainingCount }} 个，滚动查看</p>
     </div>
 
     <div v-else class="empty-state">

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useSettingsStore } from '../../stores/settings'
 import { buildSearchUrl, isSearchSubmitKey } from '../../search/searchNavigation'
+import { navigateAfterSavingSettings } from '../../utils/navigation'
 
 const store = useSettingsStore()
 const query = ref('')
@@ -32,7 +33,7 @@ function selectEngine(id: string) {
 
 function doSearch() {
   const url = buildSearchUrl(query.value, activeEngine.value)
-  if (url) window.location.href = url
+  if (url) void navigateAfterSavingSettings(url)
 }
 
 function onKeydown(e: KeyboardEvent) {

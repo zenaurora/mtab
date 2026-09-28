@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useSettingsStore } from '../../stores/settings'
 import { displayBookmarkName } from '../../utils/bookmarkIcon'
+import { navigateAfterSavingSettings } from '../../utils/navigation'
 import FaviconImage from '../FaviconImage.vue'
 
 const store = useSettingsStore()
 
 function navigate(url: string) {
-  window.location.href = url
+  void navigateAfterSavingSettings(url)
 }
 </script>
 
